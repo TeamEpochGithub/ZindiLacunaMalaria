@@ -1,3 +1,11 @@
+# Processing flags
+use_size_adjustment: true
+use_nms: true
+use_remove_edges: false
+use_spatial_density_troph: true
+use_spatial_density_wbc: true
+use_wbf: true
+
 # Size factors
 size_factor_troph: 0.9361857196459363
 size_factor_wbc: 0.9431281174768383
@@ -9,13 +17,6 @@ iou_threshold_wbc: 0.6557034314070641
 # Edge and border parameters
 edge_threshold: 0.09996729584342132
 border_threshold: 1
-
-# Processing flags
-use_size_adjustment: true
-use_nms: false
-use_remove_edges: false
-use_spatial_density_troph: true
-use_spatial_density_wbc: true
 
 # Trophozoite spatial density parameters
 option_troph: 0
@@ -34,6 +35,11 @@ percentile_low_wbc: 28
 percentile_high_wbc: 73
 low_density_adjustment_wbc: 0.9981058566511961
 high_density_adjustment_wbc: 1.0385727387576456
+
+# WBF parameters
+wbf_iou_threshold: 0.7349867625643904
+wbf_conf_threshold: 0.15916377607804047
+
 
 
 

@@ -16,3 +16,4 @@ use_nms: false
 use_remove_edges: false
 use_spatial_density_troph: false
 use_spatial_density_wbc: false
+use_wbf: false
