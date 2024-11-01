@@ -9,7 +9,14 @@ from functools import partial
 from scipy.stats import gaussian_kde
 import os
 from util.mAP_zindi import mAP_zindi_calculation
-from datetime import datetime
+from util.wbf import weighted_boxes_fusion_df
+
+
+#global cache variable
+cached_kde_wbc = None
+cached_kde_troph = None
+
+
 
 def score_on_validation_set(df, fold_num, split_csv, train_csv):
     df = df.copy()
@@ -117,6 +124,17 @@ def apply_nms(df, iou_threshold_troph=0.5, iou_threshold_wbc=0.5):
 
     df_result = pd.concat(all_results, ignore_index=True)
     return df_result
+
+def apply_wbf(df, conf_threshold=0.0, iou_threshold=0.5):
+    """
+    Apply weighted box fusion to the DataFrame
+    """    
+    # Apply WBF
+    df = weighted_boxes_fusion_df(df=df, conf_thresh=conf_threshold , iou_thresh=iou_threshold)
+    
+    # Convert back to DataFram
+    
+    return df
 
 def assign_neg_class(neg_csv, df):
     neg_df = pd.read_csv(neg_csv)
@@ -255,49 +273,46 @@ def remove_bbox_near_edges(df, data_dir, edge_threshold=0.1, border_threshold=20
     return df
 
 def basic_postprocess(df, data_dir, neg_csv, test_csv):
-    submission_df = add_img_shape_column(data_dir, df)
-    neg_rows = submission_df[submission_df['class'] == 'NEG']
-    filtered_dfs = submission_df[submission_df['class'] != 'NEG']
+    # submission_df = add_img_shape_column(data_dir, df)
+    neg_rows = df[df['class'] == 'NEG']
+    filtered_dfs = df[df['class'] != 'NEG']
     filtered_dfs = no_wbc_labels_in_certain_size(filtered_dfs)
     filtered_dfs = filtered_dfs.drop(columns=['img_shape'])
     neg_rows = neg_rows.drop(columns=['img_shape'])
     filtered_dfs = pd.concat([filtered_dfs, neg_rows], ignore_index=True)
     filtered_dfs = add_negs_to_submission(filtered_dfs, neg_csv, test_csv)
     filtered_dfs = assign_neg_class(neg_csv, filtered_dfs)
-    filtered_dfs = filtered_dfs[['Image_ID', 'class', 'confidence', 'ymin', 'xmin', 'ymax', 'xmax']]
+    
     return filtered_dfs
 
 def spatial_density_contour_troph(
-    df, train_csv, img_folder, option=0,
+    df, df_train, img_folder, option=0,
     base_adjustment=0.95, density_multiplier=0.1,
     percentile_low=25, percentile_high=75,
     low_density_adjustment=0.98, high_density_adjustment=1.02,
     log_scale_factor=0.04, expit_scale=3,
     adjustment_range_low=0.98, adjustment_range_high=1.02
 ):
-    df_train = pd.read_csv(train_csv)
-    df_train = process_df_bbox(df_train, img_folder)
-    df = process_df_bbox(df, img_folder)
-    df_troph = df[df['class'] == 'Trophozoite'].copy()
-    df_train_troph = df_train[df_train['class'] == 'Trophozoite']
+    global cached_kde_troph
 
-    kernel_density_troph = gaussian_kde(df_train_troph[['norm_center_x', 'norm_center_y']].T)
-    kde_density_troph = kernel_density_troph.evaluate(df_troph[['norm_center_x', 'norm_center_y']].T)
+    if cached_kde_troph is None:
+        initialize_troph_kde(df_train)
+
+    # Filter Trophozoite data only
+    df_troph = df[df['class'] == 'Trophozoite'].copy()
+    kde_density_troph = cached_kde_troph.evaluate(df_troph[['norm_center_x', 'norm_center_y']].T)
     kde_density_norm = kde_density_troph / kde_density_troph.max()
 
     if option == 0:
         adjustment = base_adjustment + (density_multiplier * kde_density_norm)
-        df_troph['confidence'] = df_troph['confidence'] * adjustment
     elif option == 1:
         density_percentile = np.percentile(kde_density_norm, [percentile_low, percentile_high])
         adjustment = np.ones_like(kde_density_norm)
         adjustment[kde_density_norm < density_percentile[0]] = low_density_adjustment
         adjustment[kde_density_norm > density_percentile[1]] = high_density_adjustment
-        df_troph['confidence'] = df_troph['confidence'] * adjustment
     elif option == 2:
-        log_scale = np.log1p(kde_density_norm) / np.log1p(1)
+        log_scale = np.log1p(kde_density_norm)
         adjustment = adjustment_range_low + (log_scale_factor * log_scale)
-        df_troph['confidence'] = df_troph['confidence'] * adjustment
     elif option == 3:
         high_density_threshold = np.percentile(kde_density_norm, percentile_high)
         low_density_threshold = np.percentile(kde_density_norm, percentile_low)
@@ -306,50 +321,58 @@ def spatial_density_contour_troph(
         adjustment = np.ones_like(kde_density_norm)
         adjustment[high_density_mask] = high_density_adjustment
         adjustment[low_density_mask] = low_density_adjustment
-        df_troph['confidence'] = df_troph['confidence'] * adjustment
     elif option == 4:
         from scipy.special import expit
         centered_density = kde_density_norm - kde_density_norm.mean()
         smooth_step = expit(centered_density * expit_scale)
         adjustment = adjustment_range_low + ((adjustment_range_high - adjustment_range_low) * smooth_step)
-        df_troph['confidence'] = df_troph['confidence'] * adjustment
 
-    df_troph['confidence'] = np.clip(df_troph['confidence'], 0, 1)
+    # Apply adjustment and clip
+    df_troph['confidence'] = np.clip(df_troph['confidence'] * adjustment, 0, 1)
     df.loc[df['class'] == 'Trophozoite', 'confidence'] = df_troph['confidence'].values
-    df = df[['Image_ID', 'class', 'confidence', 'ymin', 'xmin', 'ymax', 'xmax']]
+
     return df
 
+def initialize_WBC_kde(df_train):
+    global cached_kde_wbc
+    df_train_wbc = df_train[df_train['class'] == 'WBC']
+    cached_kde_wbc = gaussian_kde(df_train_wbc[['norm_center_x', 'norm_center_y']].T)
+
+def initialize_troph_kde(df_train):
+    global cached_kde_troph
+    df_train_troph = df_train[df_train['class'] == 'Trophozoite']
+    cached_kde_troph = gaussian_kde(df_train_troph[['norm_center_x', 'norm_center_y']].T)
+
+
+
 def spatial_density_contour_wbc(
-    df, train_csv, img_folder, option=0,
+    df, df_train, img_folder, option=0,
     base_adjustment=0.95, density_multiplier=0.1,
     percentile_low=25, percentile_high=75,
     low_density_adjustment=0.98, high_density_adjustment=1.02,
     log_scale_factor=0.04, expit_scale=3,
     adjustment_range_low=0.98, adjustment_range_high=1.02
 ):
-    df_train = pd.read_csv(train_csv)
-    df_train = process_df_bbox(df_train, img_folder)
-    df = process_df_bbox(df, img_folder)
-    df_wbc = df[df['class'] == 'WBC'].copy()
-    df_train_wbc = df_train[df_train['class'] == 'WBC']
+    global cached_kde_wbc
 
-    kernel_density_wbc = gaussian_kde(df_train_wbc[['norm_center_x', 'norm_center_y']].T)
-    kde_density_wbc = kernel_density_wbc.evaluate(df_wbc[['norm_center_x', 'norm_center_y']].T)
+    if cached_kde_wbc is None:
+        initialize_WBC_kde(df_train)
+
+    # Filter WBC data only
+    df_wbc = df[df['class'] == 'WBC'].copy()
+    kde_density_wbc = cached_kde_wbc.evaluate(df_wbc[['norm_center_x', 'norm_center_y']].T)
     kde_density_norm = kde_density_wbc / kde_density_wbc.max()
 
     if option == 0:
         adjustment = base_adjustment + (density_multiplier * kde_density_norm)
-        df_wbc['confidence'] = df_wbc['confidence'] * adjustment
     elif option == 1:
         density_percentile = np.percentile(kde_density_norm, [percentile_low, percentile_high])
         adjustment = np.ones_like(kde_density_norm)
         adjustment[kde_density_norm < density_percentile[0]] = low_density_adjustment
         adjustment[kde_density_norm > density_percentile[1]] = high_density_adjustment
-        df_wbc['confidence'] = df_wbc['confidence'] * adjustment
     elif option == 2:
-        log_scale = np.log1p(kde_density_norm) / np.log1p(1)
+        log_scale = np.log1p(kde_density_norm)
         adjustment = adjustment_range_low + (log_scale_factor * log_scale)
-        df_wbc['confidence'] = df_wbc['confidence'] * adjustment
     elif option == 3:
         high_density_threshold = np.percentile(kde_density_norm, percentile_high)
         low_density_threshold = np.percentile(kde_density_norm, percentile_low)
@@ -358,22 +381,29 @@ def spatial_density_contour_wbc(
         adjustment = np.ones_like(kde_density_norm)
         adjustment[high_density_mask] = high_density_adjustment
         adjustment[low_density_mask] = low_density_adjustment
-        df_wbc['confidence'] = df_wbc['confidence'] * adjustment
     elif option == 4:
         from scipy.special import expit
         centered_density = kde_density_norm - kde_density_norm.mean()
         smooth_step = expit(centered_density * expit_scale)
         adjustment = adjustment_range_low + ((adjustment_range_high - adjustment_range_low) * smooth_step)
-        df_wbc['confidence'] = df_wbc['confidence'] * adjustment
 
-    df_wbc['confidence'] = np.clip(df_wbc['confidence'], 0, 1)
+    # Apply adjustment and clip
+    df_wbc['confidence'] = np.clip(df_wbc['confidence'] * adjustment, 0, 1)
     df.loc[df['class'] == 'WBC', 'confidence'] = df_wbc['confidence'].values
-    df = df[['Image_ID', 'class', 'confidence', 'ymin', 'xmin', 'ymax', 'xmax']]
+
     return df
 
 
 
 def postprocessing_pipeline(CONFIG):
+
+    use_wbf = CONFIG.get('use_wbf', False)
+    use_size_adjustment = CONFIG.get('use_size_adjustment', True)
+    use_nms = CONFIG.get('use_nms', True)
+    use_remove_edges = CONFIG.get('use_remove_edges', True)
+    use_spatial_density_troph = CONFIG.get('use_spatial_density_troph', True)
+    use_spatial_density_wbc = CONFIG.get('use_spatial_density_wbc', True)
+
     # Unpack parameters
     size_factor_troph = CONFIG.get('size_factor_troph', 1.0)
     size_factor_wbc = CONFIG.get('size_factor_wbc', 1.0)
@@ -381,13 +411,10 @@ def postprocessing_pipeline(CONFIG):
     iou_threshold_wbc = CONFIG.get('iou_threshold_wbc', 0.5)
     edge_threshold = CONFIG.get('edge_threshold', 0.1)
     border_threshold = CONFIG.get('border_threshold', 20)
-    use_size_adjustment = CONFIG.get('use_size_adjustment', True)
-    use_nms = CONFIG.get('use_nms', True)
-    use_remove_edges = CONFIG.get('use_remove_edges', True)
-    use_spatial_density_troph = CONFIG.get('use_spatial_density_troph', True)
-    use_spatial_density_wbc = CONFIG.get('use_spatial_density_wbc', True)
     option_troph = CONFIG.get('option_troph', 0)
     option_wbc = CONFIG.get('option_wbc', 0)
+    wbf_conf_threshold = CONFIG.get('wbf_conf_threshold', 0.0)
+    wbf_iou_threshold = CONFIG.get('wbf_iou_threshold', 0.5)
 
     # Parameters for spatial_density_contour_troph
     base_adjustment_troph = CONFIG.get('base_adjustment_troph', 0.95)
@@ -415,28 +442,36 @@ def postprocessing_pipeline(CONFIG):
 
     # Read initial data
     df = pd.read_csv(CONFIG['INPUT_CSV'])
-    print(df.head())
-    df = basic_postprocess(df, CONFIG['DATA_DIR'], CONFIG['NEG_CSV'], CONFIG['TEST_CSV'])
+    train_df = pd.read_csv(CONFIG['TRAIN_CSV'])
 
     # Process bounding boxes
     df = process_df_bbox(df, CONFIG['DATA_DIR'])
+    train_df = process_df_bbox(train_df, CONFIG['DATA_DIR'])
 
+    df = basic_postprocess(df, CONFIG['DATA_DIR'], CONFIG['NEG_CSV'], CONFIG['TEST_CSV'])
+   
     # Optional: Size adjustment
     if use_size_adjustment:
         df = factor_bbox_size_change(df, size_factor_troph, size_factor_wbc)
 
-    # Optional: Remove bounding boxes near edges
-    if use_remove_edges:
-        df = remove_bbox_near_edges(df, CONFIG['DATA_DIR'], edge_threshold, border_threshold)
-
     # Optional: Apply NMS
+   
     if use_nms:
         df = apply_nms(df, iou_threshold_troph, iou_threshold_wbc)
+
+    if use_wbf:
+        df = apply_wbf(df, conf_threshold=wbf_conf_threshold, iou_threshold=wbf_iou_threshold)
+
+
+    # Optional: Remove bounding boxes near edges
+   
+    if use_remove_edges:
+        df = remove_bbox_near_edges(df, CONFIG['DATA_DIR'], edge_threshold, border_threshold)
 
     # Optional: Apply spatial density contour for Trophozoite
     if use_spatial_density_troph:
         df = spatial_density_contour_troph(
-            df, CONFIG['TRAIN_CSV'], CONFIG['DATA_DIR'], option_troph,
+            df, train_df, CONFIG['DATA_DIR'], option_troph,
             base_adjustment=base_adjustment_troph,
             density_multiplier=density_multiplier_troph,
             percentile_low=percentile_low_troph,
@@ -452,7 +487,7 @@ def postprocessing_pipeline(CONFIG):
     # Optional: Apply spatial density contour for WBC
     if use_spatial_density_wbc:
         df = spatial_density_contour_wbc(
-            df, CONFIG['TRAIN_CSV'], CONFIG['DATA_DIR'], option_wbc,
+            df, train_df, CONFIG['DATA_DIR'], option_wbc,
             base_adjustment=base_adjustment_wbc,
             density_multiplier=density_multiplier_wbc,
             percentile_low=percentile_low_wbc,
@@ -472,20 +507,48 @@ if __name__ == "__main__":
 
 
     # Base config for file paths
-    yolo_config_file = "parameters/postprocessing_config_files/yolo_postprocessing/yolo_pp.yaml"
+    yolo_config_file = "parameters/postprocessing_config_files/yolo_postprocessing/yolo_pp2.yaml"
     base_config_file = "parameters/postprocessing_config_files/base_pp.yaml"
 
     base_config = dict(yaml.safe_load(open(base_config_file, 'r')))
     pp_yolo_config = dict(yaml.safe_load(open(yolo_config_file, 'r')))
 
-    #create a dictionary for the output csv
-    os.makedirs(os.path.dirname(base_config['OUTPUT_CSV']), exist_ok=True)
-
     CONFIG = base_config
     # Load parameters for the selected trial
     CONFIG.update(pp_yolo_config)
 
-    # Run postprocessing pipeline with selected trial parameters
-    df_processed = postprocessing_pipeline(CONFIG)
+    import cProfile
+    import pstats
+    import io
 
-    df_processed.to_csv(CONFIG['OUTPUT_CSV'], index=False)
+    def profile_postprocessing(CONFIG):
+        pr = cProfile.Profile()
+        pr.enable()
+        
+        # Run the postprocessing pipeline function
+        postprocessing_pipeline(CONFIG)
+        
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        
+        # Display profiling results
+        print(s.getvalue())
+
+
+    # Run profiling
+    profile_postprocessing(CONFIG)
+
+
+    # #create a dictionary for the output csv
+    # os.makedirs(os.path.dirname(base_config['OUTPUT_CSV']), exist_ok=True)
+
+
+
+    # t1 = datetime.now()
+    # # Run postprocessing pipeline with selected trial parameters
+    # df_processed = postprocessing_pipeline(CONFIG)
+
+    # df_processed.to_csv(CONFIG['OUTPUT_CSV'], index=False)
