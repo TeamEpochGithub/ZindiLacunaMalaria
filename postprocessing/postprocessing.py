@@ -10,13 +10,12 @@ from scipy.stats import gaussian_kde
 import os
 from util.mAP_zindi import mAP_zindi_calculation
 from util.wbf import weighted_boxes_fusion_df
-
+from util.nms import apply_class_specific_nms
+from util.wbf import apply_wbf_to_df
 
 #global cache variable
 cached_kde_wbc = None
 cached_kde_troph = None
-
-
 
 def score_on_validation_set(df, fold_num, split_csv, train_csv):
     df = df.copy()
@@ -48,93 +47,6 @@ def no_wbc_labels_in_certain_size(df):
     mask = (df['img_shape'].apply(lambda x: tuple(x) if isinstance(x, np.ndarray) else x) == certain_size) & (df['class'] == 'WBC')
     return df[~mask]
 
-def normalize_boxes(boxes):
-    return np.clip(boxes, 0, 1)
-
-def group_boxes(group):
-    boxes = group[['xmin', 'ymin', 'xmax', 'ymax']].values.astype(float)
-    scores = group['confidence'].values.astype(float)
-    image_width, image_height = group['img_shape'].iloc[0][1], group['img_shape'].iloc[0][0]
-    boxes[:, [0, 2]] /= image_width
-    boxes[:, [1, 3]] /= image_height
-    boxes = normalize_boxes(boxes)
-    return boxes, scores, image_width, image_height
-
-def _bb_intersection_over_union(boxA, boxB):
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
-
-    interArea = max(0, xB - xA + 1e-5) * max(0, yB - yA + 1e-5)
-
-    boxAArea = (boxA[2] - boxA[0] + 1e-5) * (boxA[3] - boxA[1] + 1e-5)
-    boxBArea = (boxB[2] - boxB[0] + 1e-5) * (boxB[3] - boxB[1] + 1e-5)
-
-    iou = interArea / float(boxAArea + boxBArea - interArea)
-
-    return iou
-
-def _non_max_suppression(boxes, scores, threshold):
-    order = scores.argsort()[::-1]
-    keep = []
-
-    while order.size > 0:
-        i = order[0]
-        keep.append(i)
-
-        ious = np.array([_bb_intersection_over_union(boxes[i], boxes[j]) for j in order[1:]])
-
-        inds = np.where(ious <= threshold)[0]
-        order = order[inds + 1]
-
-    return keep
-
-def apply_nms(df, iou_threshold_troph=0.5, iou_threshold_wbc=0.5):
-    df_troph = df[df['class'] == 'Trophozoite']
-    df_wbc = df[df['class'] == 'WBC']
-    df_neg = df[df['class'] == 'NEG']
-
-    results_troph = []
-    results_wbc = []
-
-    if not df_troph.empty:
-        grouped_troph = df_troph.groupby('Image_ID')
-        for image_id, group in grouped_troph:
-            boxes = group[['xmin', 'ymin', 'xmax', 'ymax']].values.astype(float)
-            scores = group['confidence'].values.astype(float)
-            keep = _non_max_suppression(boxes, scores, iou_threshold_troph)
-            results_troph.append(group.iloc[keep])
-
-    if not df_wbc.empty:
-        grouped_wbc = df_wbc.groupby('Image_ID')
-        for image_id, group in grouped_wbc:
-            boxes = group[['xmin', 'ymin', 'xmax', 'ymax']].values.astype(float)
-            scores = group['confidence'].values.astype(float)
-            keep = _non_max_suppression(boxes, scores, iou_threshold_wbc)
-            results_wbc.append(group.iloc[keep])
-
-    all_results = []
-    if results_troph:
-        all_results.extend(results_troph)
-    if results_wbc:
-        all_results.extend(results_wbc)
-    if not df_neg.empty:
-        all_results.append(df_neg)
-
-    df_result = pd.concat(all_results, ignore_index=True)
-    return df_result
-
-def apply_wbf(df, conf_threshold=0.0, iou_threshold=0.5):
-    """
-    Apply weighted box fusion to the DataFrame
-    """    
-    # Apply WBF
-    df = weighted_boxes_fusion_df(df=df, conf_thresh=conf_threshold , iou_thresh=iou_threshold)
-    
-    # Convert back to DataFram
-    
-    return df
 
 def assign_neg_class(neg_csv, df):
     neg_df = pd.read_csv(neg_csv)
@@ -395,7 +307,7 @@ def spatial_density_contour_wbc(
 
 
 
-def postprocessing_pipeline(CONFIG):
+def postprocessing_pipeline(CONFIG, df=None):
 
     use_wbf = CONFIG.get('use_wbf', False)
     use_size_adjustment = CONFIG.get('use_size_adjustment', True)
@@ -441,7 +353,9 @@ def postprocessing_pipeline(CONFIG):
     adjustment_range_high_wbc = CONFIG.get('adjustment_range_high_wbc', 1.02)
 
     # Read initial data
-    df = pd.read_csv(CONFIG['INPUT_CSV'])
+    if df is None:
+        df = pd.read_csv(CONFIG['INPUT_CSV'])
+    
     train_df = pd.read_csv(CONFIG['TRAIN_CSV'])
 
     # Process bounding boxes
@@ -455,16 +369,14 @@ def postprocessing_pipeline(CONFIG):
         df = factor_bbox_size_change(df, size_factor_troph, size_factor_wbc)
 
     # Optional: Apply NMS
-   
     if use_nms:
-        df = apply_nms(df, iou_threshold_troph, iou_threshold_wbc)
+        df = apply_class_specific_nms(df, iou_threshold_troph, iou_threshold_wbc)
 
     if use_wbf:
-        df = apply_wbf(df, conf_threshold=wbf_conf_threshold, iou_threshold=wbf_iou_threshold)
+        df = apply_wbf_to_df(df, conf_threshold=wbf_conf_threshold, iou_threshold=wbf_iou_threshold)
 
 
     # Optional: Remove bounding boxes near edges
-   
     if use_remove_edges:
         df = remove_bbox_near_edges(df, CONFIG['DATA_DIR'], edge_threshold, border_threshold)
 
@@ -517,38 +429,35 @@ if __name__ == "__main__":
     # Load parameters for the selected trial
     CONFIG.update(pp_yolo_config)
 
-    import cProfile
-    import pstats
-    import io
+    #create a dictionary for the output csv
+    os.makedirs(os.path.dirname(base_config['OUTPUT_CSV']), exist_ok=True)
+    # Run postprocessing pipeline with selected trial parameters
+    df_processed = postprocessing_pipeline(CONFIG)
 
-    def profile_postprocessing(CONFIG):
-        pr = cProfile.Profile()
-        pr.enable()
+    df_processed.to_csv(CONFIG['OUTPUT_CSV'], index=False)
+
+
+
+# import cProfile
+#     import pstats
+#     import io
+
+#     def profile_postprocessing(CONFIG):
+#         pr = cProfile.Profile()
+#         pr.enable()
         
-        # Run the postprocessing pipeline function
-        postprocessing_pipeline(CONFIG)
+#         # Run the postprocessing pipeline function
+#         postprocessing_pipeline(CONFIG)
         
-        pr.disable()
-        s = io.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
+#         pr.disable()
+#         s = io.StringIO()
+#         sortby = 'cumulative'
+#         ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+#         ps.print_stats()
         
-        # Display profiling results
-        print(s.getvalue())
+#         # Display profiling results
+#         print(s.getvalue())
 
 
-    # Run profiling
-    profile_postprocessing(CONFIG)
-
-
-    # #create a dictionary for the output csv
-    # os.makedirs(os.path.dirname(base_config['OUTPUT_CSV']), exist_ok=True)
-
-
-
-    # t1 = datetime.now()
-    # # Run postprocessing pipeline with selected trial parameters
-    # df_processed = postprocessing_pipeline(CONFIG)
-
-    # df_processed.to_csv(CONFIG['OUTPUT_CSV'], index=False)
+#     # Run profiling
+#     profile_postprocessing(CONFIG)
