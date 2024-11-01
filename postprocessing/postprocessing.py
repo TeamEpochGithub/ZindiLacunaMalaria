@@ -373,7 +373,7 @@ def postprocessing_pipeline(CONFIG, df=None):
         df = apply_class_specific_nms(df, iou_threshold_troph, iou_threshold_wbc)
 
     if use_wbf:
-        df = apply_wbf_to_df(df, conf_threshold=wbf_conf_threshold, iou_threshold=wbf_iou_threshold)
+        df = apply_wbf_to_df(df, conf_thresh=wbf_conf_threshold, iou_thresh=wbf_iou_threshold)
 
 
     # Optional: Remove bounding boxes near edges

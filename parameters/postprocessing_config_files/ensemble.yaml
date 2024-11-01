@@ -1,0 +1,269 @@
+# config.yaml
+
+# Input/Output settings
+input:
+  yolo_models_path: "parameters/yolo_config_files/*.yaml"
+  detr_csv_path: "submissions/interim/detr.csv"
+  yolo_csv_paths:
+    - "submissions/interim/predictions_9s_neg_preds_WBCremoved.csv"
+    # - "submissions/interim/predictions_yolo11_WBC-r_Trop-sq.csv"
+    # - "submissions/interim/predictions_yolo11.csv"
+    # - "submissions/interim/predictions_yolo11m-ep66_WBC-r_Trop-sq_nms.csv"
+    # - "submissions/interim/yolo_sweep_874.csv"
+
+  train_csv: "data/csv_files/Train.csv"
+  neg_csv: "data/csv_files/NEG_OR_NOT.csv"
+  test_csv: "data/csv_files/Test.csv"
+  data_dir: "data/img"
+
+output:
+  path: "submissions/ensemble_results.csv"
+
+# Ensemble parameters
+ensemble:
+  iou_threshold: 0.5
+  confidence_threshold: 0.1
+
+# Postprocessing configurations
+postprocessing:
+  # Individual YOLO models postprocessing
+  individual_yolo:
+    enabled: true
+    config:
+      use_wbf: false
+      use_size_adjustment: true
+      use_nms: true
+      use_remove_edges: true
+      use_spatial_density_troph: true
+      use_spatial_density_wbc: true
+      
+      # Size adjustment parameters
+      size_factor_troph: 1.0
+      size_factor_wbc: 1.0
+      
+      # NMS parameters
+      iou_threshold_troph: 0.5
+      iou_threshold_wbc: 0.5
+      
+      # WBF parameters
+      wbf_conf_threshold: 0.0
+      wbf_iou_threshold: 0.5
+      
+      # Edge removal parameters
+      edge_threshold: 0.1
+      border_threshold: 20
+      
+      # Spatial density options
+      option_troph: 0
+      option_wbc: 0
+      
+      # Trophozoite spatial density parameters
+      base_adjustment_troph: 0.95
+      density_multiplier_troph: 0.1
+      percentile_low_troph: 25
+      percentile_high_troph: 75
+      low_density_adjustment_troph: 0.98
+      high_density_adjustment_troph: 1.02
+      log_scale_factor_troph: 0.04
+      expit_scale_troph: 3
+      adjustment_range_low_troph: 0.98
+      adjustment_range_high_troph: 1.02
+      
+      # WBC spatial density parameters
+      base_adjustment_wbc: 0.95
+      density_multiplier_wbc: 0.1
+      percentile_low_wbc: 25
+      percentile_high_wbc: 75
+      low_density_adjustment_wbc: 0.98
+      high_density_adjustment_wbc: 1.02
+      log_scale_factor_wbc: 0.04
+      expit_scale_wbc: 3
+      adjustment_range_low_wbc: 0.98
+      adjustment_range_high_wbc: 1.02
+      
+      # Required paths
+      DATA_DIR: "${input.data_dir}"
+      TRAIN_CSV: "${input.train_csv}"
+      NEG_CSV: "${input.neg_csv}"
+      TEST_CSV: "${input.test_csv}"
+
+  # DETR postprocessing
+  detr:
+    enabled: true
+    config:
+      use_wbf: false
+      use_size_adjustment: true
+      use_nms: true
+      use_remove_edges: true
+      use_spatial_density_troph: true
+      use_spatial_density_wbc: true
+      
+      # Size adjustment parameters
+      size_factor_troph: 1.0
+      size_factor_wbc: 1.0
+      
+      # NMS parameters
+      iou_threshold_troph: 0.5
+      iou_threshold_wbc: 0.5
+      
+      # WBF parameters
+      wbf_conf_threshold: 0.0
+      wbf_iou_threshold: 0.5
+      
+      # Edge removal parameters
+      edge_threshold: 0.1
+      border_threshold: 20
+      
+      # Spatial density options
+      option_troph: 0
+      option_wbc: 0
+      
+      # Trophozoite spatial density parameters
+      base_adjustment_troph: 0.95
+      density_multiplier_troph: 0.1
+      percentile_low_troph: 25
+      percentile_high_troph: 75
+      low_density_adjustment_troph: 0.98
+      high_density_adjustment_troph: 1.02
+      log_scale_factor_troph: 0.04
+      expit_scale_troph: 3
+      adjustment_range_low_troph: 0.98
+      adjustment_range_high_troph: 1.02
+      
+      # WBC spatial density parameters
+      base_adjustment_wbc: 0.95
+      density_multiplier_wbc: 0.1
+      percentile_low_wbc: 25
+      percentile_high_wbc: 75
+      low_density_adjustment_wbc: 0.98
+      high_density_adjustment_wbc: 1.02
+      log_scale_factor_wbc: 0.04
+      expit_scale_wbc: 3
+      adjustment_range_low_wbc: 0.98
+      adjustment_range_high_wbc: 1.02
+      
+      # Required paths
+      DATA_DIR: "${input.data_dir}"
+      TRAIN_CSV: "${input.train_csv}"
+      NEG_CSV: "${input.neg_csv}"
+      TEST_CSV: "${input.test_csv}"
+  # Ensemble YOLO postprocessing
+  ensemble_yolo:
+    enabled: true
+    config:
+      use_wbf: false
+      use_size_adjustment: true
+      use_nms: true
+      use_remove_edges: true
+      use_spatial_density_troph: true
+      use_spatial_density_wbc: true
+      
+      # Size adjustment parameters
+      size_factor_troph: 1.0
+      size_factor_wbc: 1.0
+      
+      # NMS parameters
+      iou_threshold_troph: 0.5
+      iou_threshold_wbc: 0.5
+      
+      # WBF parameters
+      wbf_conf_threshold: 0.0
+      wbf_iou_threshold: 0.5
+      
+      # Edge removal parameters
+      edge_threshold: 0.1
+      border_threshold: 20
+      
+      # Spatial density options
+      option_troph: 0
+      option_wbc: 0
+      
+      # Trophozoite spatial density parameters
+      base_adjustment_troph: 0.95
+      density_multiplier_troph: 0.1
+      percentile_low_troph: 25
+      percentile_high_troph: 75
+      low_density_adjustment_troph: 0.98
+      high_density_adjustment_troph: 1.02
+      log_scale_factor_troph: 0.04
+      expit_scale_troph: 3
+      adjustment_range_low_troph: 0.98
+      adjustment_range_high_troph: 1.02
+      
+      # WBC spatial density parameters
+      base_adjustment_wbc: 0.95
+      density_multiplier_wbc: 0.1
+      percentile_low_wbc: 25
+      percentile_high_wbc: 75
+      low_density_adjustment_wbc: 0.98
+      high_density_adjustment_wbc: 1.02
+      log_scale_factor_wbc: 0.04
+      expit_scale_wbc: 3
+      adjustment_range_low_wbc: 0.98
+      adjustment_range_high_wbc: 1.02
+      
+      # Required paths
+      DATA_DIR: "${input.data_dir}"
+      TRAIN_CSV: "${input.train_csv}"
+      NEG_CSV: "${input.neg_csv}"
+      TEST_CSV: "${input.test_csv}"
+  # Final ensemble postprocessing
+  ensemble_all:
+    enabled: true
+    config:
+      use_wbf: false
+      use_size_adjustment: true
+      use_nms: true
+      use_remove_edges: true
+      use_spatial_density_troph: true
+      use_spatial_density_wbc: true
+      
+      # Size adjustment parameters
+      size_factor_troph: 1.0
+      size_factor_wbc: 1.0
+      
+      # NMS parameters
+      iou_threshold_troph: 0.5
+      iou_threshold_wbc: 0.5
+      
+      # WBF parameters
+      wbf_conf_threshold: 0.0
+      wbf_iou_threshold: 0.5
+      
+      # Edge removal parameters
+      edge_threshold: 0.1
+      border_threshold: 20
+      
+      # Spatial density options
+      option_troph: 0
+      option_wbc: 0
+      
+      # Trophozoite spatial density parameters
+      base_adjustment_troph: 0.95
+      density_multiplier_troph: 0.1
+      percentile_low_troph: 25
+      percentile_high_troph: 75
+      low_density_adjustment_troph: 0.98
+      high_density_adjustment_troph: 1.02
+      log_scale_factor_troph: 0.04
+      expit_scale_troph: 3
+      adjustment_range_low_troph: 0.98
+      adjustment_range_high_troph: 1.02
+      
+      # WBC spatial density parameters
+      base_adjustment_wbc: 0.95
+      density_multiplier_wbc: 0.1
+      percentile_low_wbc: 25
+      percentile_high_wbc: 75
+      low_density_adjustment_wbc: 0.98
+      high_density_adjustment_wbc: 1.02
+      log_scale_factor_wbc: 0.04
+      expit_scale_wbc: 3
+      adjustment_range_low_wbc: 0.98
+      adjustment_range_high_wbc: 1.02
+      
+      # Required paths
+      DATA_DIR: "${input.data_dir}"
+      TRAIN_CSV: "${input.train_csv}"
+      NEG_CSV: "${input.neg_csv}"
+      TEST_CSV: "${input.test_csv}"
