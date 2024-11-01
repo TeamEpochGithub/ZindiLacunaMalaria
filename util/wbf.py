@@ -44,7 +44,6 @@ def calculate_iou(box1: Tuple[float, float, float, float],
     # Return IoU
     return inter_area / union_area if union_area > 0 else 0
 
-
 def process_single_image(image_data: tuple) -> pd.DataFrame:
     """
     Process a single image's predictions using WBF
@@ -104,7 +103,6 @@ def process_single_image(image_data: tuple) -> pd.DataFrame:
                              ignore_index=True)
 
     return final_df
-
 
 def weighted_boxes_fusion(pass_df: bool,
                           input_path: str,
@@ -178,8 +176,6 @@ def weighted_boxes_fusion(pass_df: bool,
     # Save final predictions
     final_df.to_csv(output_path, index=False)
 
-
-
 def weighted_boxes_fusion_df(
                           df: pd.DataFrame,
                           conf_thresh: float = 0.5,
@@ -231,7 +227,8 @@ def weighted_boxes_fusion_df(
 
     return final_df
 
-    
+def apply_wbf_to_df(df: pd.DataFrame, conf_thresh: float = 0.5, iou_thresh: float = 0.5):
+    return weighted_boxes_fusion_df(df, conf_thresh=conf_thresh, iou_thresh=iou_thresh)
 
 
 if __name__ == "__main__":
