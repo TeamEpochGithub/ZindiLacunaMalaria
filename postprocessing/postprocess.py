@@ -17,19 +17,19 @@ from util.wbf import apply_wbf_to_df
 cached_kde_wbc = None
 cached_kde_troph = None
 
-def score_on_validation_set(df, fold_num, split_csv, train_csv):
-    df = df.copy()
-    folds_df = pd.read_csv(split_csv)
-    train_df = pd.read_csv(train_csv)
+# def score_on_validation_set(df, fold_num, split_csv, train_csv):
+#     df = df.copy()
+#     folds_df = pd.read_csv(split_csv)
+#     train_df = pd.read_csv(train_csv)
 
-    fold_df = folds_df[folds_df['Split'] == fold_num]
-    val_imgs = set(fold_df['Image_ID'])
+#     fold_df = folds_df[folds_df['Split'] == fold_num]
+#     val_imgs = set(fold_df['Image_ID'])
 
-    pred_df = df[df['Image_ID'].isin(val_imgs)]
-    df_val = train_df[train_df['Image_ID'].isin(val_imgs)]
-    print(f"Number of images in validation set: {len(val_imgs)}")
-    print(f"Number of images in prediction set: {len(pred_df)}")
-    return mAP_zindi_calculation(df_val, pred_df)
+#     pred_df = df[df['Image_ID'].isin(val_imgs)]
+#     df_val = train_df[train_df['Image_ID'].isin(val_imgs)]
+#     print(f"Number of images in validation set: {len(val_imgs)}")
+#     print(f"Number of images in prediction set: {len(pred_df)}")
+#     return mAP_zindi_calculation(df_val, pred_df)
 
 def get_img_shape(data_dir, image_id):
     return cv2.imread(f"{data_dir}/{image_id}").shape
