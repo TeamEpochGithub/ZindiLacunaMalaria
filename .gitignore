@@ -1,6 +1,7 @@
 data/img/*
-
-
+csv_cv/*
+wandb/*
+temp_files/*
 # Submissions 
 submissions/
 
