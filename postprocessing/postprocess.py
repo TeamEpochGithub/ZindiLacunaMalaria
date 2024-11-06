@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from scipy.stats import gaussian_kde
 import os
-from util.mAP_zindi import mAP_zindi_calculation
+
 from util.wbf import weighted_boxes_fusion_df
 from util.nms import apply_class_specific_nms
 from util.wbf import apply_wbf_to_df
@@ -17,19 +17,6 @@ from util.wbf import apply_wbf_to_df
 cached_kde_wbc = None
 cached_kde_troph = None
 
-# def score_on_validation_set(df, fold_num, split_csv, train_csv):
-#     df = df.copy()
-#     folds_df = pd.read_csv(split_csv)
-#     train_df = pd.read_csv(train_csv)
-
-#     fold_df = folds_df[folds_df['Split'] == fold_num]
-#     val_imgs = set(fold_df['Image_ID'])
-
-#     pred_df = df[df['Image_ID'].isin(val_imgs)]
-#     df_val = train_df[train_df['Image_ID'].isin(val_imgs)]
-#     print(f"Number of images in validation set: {len(val_imgs)}")
-#     print(f"Number of images in prediction set: {len(pred_df)}")
-#     return mAP_zindi_calculation(df_val, pred_df)
 
 def get_img_shape(data_dir, image_id):
     return cv2.imread(f"{data_dir}/{image_id}").shape
@@ -198,23 +185,24 @@ def basic_postprocess(df, data_dir, neg_csv, test_csv):
     return filtered_dfs
 
 def spatial_density_contour_troph(
-    df, df_train, img_folder, option=0,
+    df, df_train, CONFIG, option=0,
     base_adjustment=0.95, density_multiplier=0.1,
     percentile_low=25, percentile_high=75,
     low_density_adjustment=0.98, high_density_adjustment=1.02,
     log_scale_factor=0.04, expit_scale=3,
     adjustment_range_low=0.98, adjustment_range_high=1.02
 ):
-    global cached_kde_troph
-
-    if cached_kde_troph is None:
-        initialize_troph_kde(df_train)
+  
+    
+    split_df = pd.read_csv(CONFIG["SPLIT_CSV"])
+    df_train = df_train.merge(split_df, on='Image_ID', how='left')
+    initialize_troph_kde(df_train[df_train['Split'] == CONFIG["fold_num"]])
 
     # Filter Trophozoite data only
     df_troph = df[df['class'] == 'Trophozoite'].copy()
     kde_density_troph = cached_kde_troph.evaluate(df_troph[['norm_center_x', 'norm_center_y']].T)
     kde_density_norm = kde_density_troph / kde_density_troph.max()
-
+    
     if option == 0:
         adjustment = base_adjustment + (density_multiplier * kde_density_norm)
     elif option == 1:
@@ -238,7 +226,7 @@ def spatial_density_contour_troph(
         centered_density = kde_density_norm - kde_density_norm.mean()
         smooth_step = expit(centered_density * expit_scale)
         adjustment = adjustment_range_low + ((adjustment_range_high - adjustment_range_low) * smooth_step)
-
+    
     # Apply adjustment and clip
     df_troph['confidence'] = np.clip(df_troph['confidence'] * adjustment, 0, 1)
     df.loc[df['class'] == 'Trophozoite', 'confidence'] = df_troph['confidence'].values
@@ -258,18 +246,16 @@ def initialize_troph_kde(df_train):
 
 
 def spatial_density_contour_wbc(
-    df, df_train, img_folder, option=0,
+    df, df_train, CONFIG, option=0,
     base_adjustment=0.95, density_multiplier=0.1,
     percentile_low=25, percentile_high=75,
     low_density_adjustment=0.98, high_density_adjustment=1.02,
     log_scale_factor=0.04, expit_scale=3,
     adjustment_range_low=0.98, adjustment_range_high=1.02
 ):
-    global cached_kde_wbc
-
-    if cached_kde_wbc is None:
-        initialize_WBC_kde(df_train)
-
+    split_df = pd.read_csv(CONFIG["SPLIT_CSV"])
+    df_train = df_train.merge(split_df, on='Image_ID', how='left')
+    initialize_WBC_kde(df_train[df_train['Split'] == CONFIG["fold_num"]])
     # Filter WBC data only
     df_wbc = df[df['class'] == 'WBC'].copy()
     kde_density_wbc = cached_kde_wbc.evaluate(df_wbc[['norm_center_x', 'norm_center_y']].T)
@@ -298,7 +284,9 @@ def spatial_density_contour_wbc(
         centered_density = kde_density_norm - kde_density_norm.mean()
         smooth_step = expit(centered_density * expit_scale)
         adjustment = adjustment_range_low + ((adjustment_range_high - adjustment_range_low) * smooth_step)
-
+    else:
+        adjustment = np.ones_like(kde_density_norm)
+    
     # Apply adjustment and clip
     df_wbc['confidence'] = np.clip(df_wbc['confidence'] * adjustment, 0, 1)
     df.loc[df['class'] == 'WBC', 'confidence'] = df_wbc['confidence'].values
@@ -308,13 +296,13 @@ def spatial_density_contour_wbc(
 
 
 def postprocessing_pipeline(CONFIG, df=None):
-
+    
     use_wbf = CONFIG.get('use_wbf', False)
-    use_size_adjustment = CONFIG.get('use_size_adjustment', True)
-    use_nms = CONFIG.get('use_nms', True)
-    use_remove_edges = CONFIG.get('use_remove_edges', True)
-    use_spatial_density_troph = CONFIG.get('use_spatial_density_troph', True)
-    use_spatial_density_wbc = CONFIG.get('use_spatial_density_wbc', True)
+    use_size_adjustment = CONFIG.get('use_size_adjustment', False)
+    use_nms = CONFIG.get('use_nms', False)
+    use_remove_edges = CONFIG.get('use_remove_edges', False)
+    use_spatial_density_troph = CONFIG.get('use_spatial_density_troph', False)
+    use_spatial_density_wbc = CONFIG.get('use_spatial_density_wbc', False)
 
     # Unpack parameters
     size_factor_troph = CONFIG.get('size_factor_troph', 1.0)
@@ -383,7 +371,7 @@ def postprocessing_pipeline(CONFIG, df=None):
     # Optional: Apply spatial density contour for Trophozoite
     if use_spatial_density_troph:
         df = spatial_density_contour_troph(
-            df, train_df, CONFIG['DATA_DIR'], option_troph,
+            df, train_df, CONFIG, option_troph,
             base_adjustment=base_adjustment_troph,
             density_multiplier=density_multiplier_troph,
             percentile_low=percentile_low_troph,
@@ -399,7 +387,7 @@ def postprocessing_pipeline(CONFIG, df=None):
     # Optional: Apply spatial density contour for WBC
     if use_spatial_density_wbc:
         df = spatial_density_contour_wbc(
-            df, train_df, CONFIG['DATA_DIR'], option_wbc,
+            df, train_df, CONFIG, option_wbc,
             base_adjustment=base_adjustment_wbc,
             density_multiplier=density_multiplier_wbc,
             percentile_low=percentile_low_wbc,

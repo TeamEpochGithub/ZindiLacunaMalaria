@@ -356,7 +356,7 @@ def mAP_zindi_calculation(reference, sample_submission):
         mAP  = sum_AP / n_classes
         text = "mAP = {0:.2f}%".format(mAP * 100)
         # print("Zindi mAP: ",mAP)
-        return mAP
+        return mAP, ap_dictionary, lamr_dictionary
     finally:
         # remove the temp_files directory
         shutil.rmtree(temp_files_path)
