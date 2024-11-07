@@ -1,10 +1,6 @@
 from typing import List
 
 import cv2
-import pandas as pd
-from tqdm import tqdm
-
-from inference.tta import model_tta_preprocessing
 
 
 def yolo_predict(model, image: cv2.Mat, conf: float = 0.0) -> List[dict]:
@@ -26,6 +22,3 @@ def yolo_predict(model, image: cv2.Mat, conf: float = 0.0) -> List[dict]:
                     'confidence': confidence
                 })
     return predictions
-
-
-
