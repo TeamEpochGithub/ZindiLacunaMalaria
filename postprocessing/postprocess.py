@@ -12,7 +12,7 @@ import os
 from util.wbf import weighted_boxes_fusion_df
 from util.nms import apply_class_specific_nms
 from util.wbf import apply_wbf_to_df
-
+from util.ensemble import Ensemble
 #global cache variable
 cached_kde_wbc = None
 cached_kde_troph = None
@@ -296,10 +296,8 @@ def spatial_density_contour_wbc(
 
 
 def postprocessing_pipeline(CONFIG, df=None):
-    
-    use_wbf = CONFIG.get('use_wbf', False)
+    # Unpack flags
     use_size_adjustment = CONFIG.get('use_size_adjustment', False)
-    use_nms = CONFIG.get('use_nms', False)
     use_remove_edges = CONFIG.get('use_remove_edges', False)
     use_spatial_density_troph = CONFIG.get('use_spatial_density_troph', False)
     use_spatial_density_wbc = CONFIG.get('use_spatial_density_wbc', False)
@@ -307,15 +305,12 @@ def postprocessing_pipeline(CONFIG, df=None):
     # Unpack parameters
     size_factor_troph = CONFIG.get('size_factor_troph', 1.0)
     size_factor_wbc = CONFIG.get('size_factor_wbc', 1.0)
-    iou_threshold_troph = CONFIG.get('iou_threshold_troph', 0.5)
-    iou_threshold_wbc = CONFIG.get('iou_threshold_wbc', 0.5)
+    
     edge_threshold = CONFIG.get('edge_threshold', 0.1)
     border_threshold = CONFIG.get('border_threshold', 20)
     option_troph = CONFIG.get('option_troph', 0)
     option_wbc = CONFIG.get('option_wbc', 0)
-    wbf_conf_threshold = CONFIG.get('wbf_conf_threshold', 0.0)
-    wbf_iou_threshold = CONFIG.get('wbf_iou_threshold', 0.5)
-
+    
     # Parameters for spatial_density_contour_troph
     base_adjustment_troph = CONFIG.get('base_adjustment_troph', 0.95)
     density_multiplier_troph = CONFIG.get('density_multiplier_troph', 0.1)
@@ -356,14 +351,6 @@ def postprocessing_pipeline(CONFIG, df=None):
     if use_size_adjustment:
         df = factor_bbox_size_change(df, size_factor_troph, size_factor_wbc)
 
-    # Optional: Apply NMS
-    if use_nms:
-        df = apply_class_specific_nms(df, iou_threshold_troph, iou_threshold_wbc)
-
-    if use_wbf:
-        df = apply_wbf_to_df(df, conf_thresh=wbf_conf_threshold, iou_thresh=wbf_iou_threshold)
-
-
     # Optional: Remove bounding boxes near edges
     if use_remove_edges:
         df = remove_bbox_near_edges(df, CONFIG['DATA_DIR'], edge_threshold, border_threshold)
@@ -402,6 +389,29 @@ def postprocessing_pipeline(CONFIG, df=None):
 
     df = df[['Image_ID', 'class', 'confidence', 'ymin', 'xmin', 'ymax', 'xmax']]
     return df
+
+
+def ensemble_pipeline(CONFIG, df_list, weight_list):
+    """Run ensemble pipeline on a list of dataframes. Using nms,wbf or soft-nms. specify conf and iou thresholds+wbf_reduction"""
+    form = CONFIG.get('form', 'wbf')
+    nms_iou_threshold = CONFIG.get('nms_iou_threshold', 0.6)
+    wbf_iou_threshold = CONFIG.get('wbf_iou_threshold', 0.6)
+    conf_threshold = CONFIG.get('wbf_conf_threshold', 0.01)
+    wbf_reduction = CONFIG.get('wbf_reduction', 'mean')
+    if form =='wbf':
+        ensemble = Ensemble(form, wbf_iou_threshold, conf_threshold, weights=weight_list, wbf_reduction=wbf_reduction)
+    elif form == 'nms':
+        ensemble = Ensemble(form, nms_iou_threshold)
+
+    elif form =='soft_nms':
+        ensemble = Ensemble(form, nms_iou_threshold)
+
+    df = ensemble(df_list)
+    return df
+
+
+
+
 
 if __name__ == "__main__":
 
