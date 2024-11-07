@@ -193,10 +193,12 @@ def spatial_density_contour_troph(
     adjustment_range_low=0.98, adjustment_range_high=1.02
 ):
   
-    
-    split_df = pd.read_csv(CONFIG["SPLIT_CSV"])
-    df_train = df_train.merge(split_df, on='Image_ID', how='left')
-    initialize_troph_kde(df_train[df_train['Split'] == CONFIG["fold_num"]])
+    if "SPLIT_CSV" in CONFIG:
+        split_df = pd.read_csv(CONFIG["SPLIT_CSV"])
+        df_train = df_train.merge(split_df, on='Image_ID', how='left')
+        initialize_troph_kde(df_train[df_train['Split'] == CONFIG["fold_num"]])
+    else:
+        initialize_troph_kde(df_train)
 
     # Filter Trophozoite data only
     df_troph = df[df['class'] == 'Trophozoite'].copy()
@@ -253,9 +255,12 @@ def spatial_density_contour_wbc(
     log_scale_factor=0.04, expit_scale=3,
     adjustment_range_low=0.98, adjustment_range_high=1.02
 ):
-    split_df = pd.read_csv(CONFIG["SPLIT_CSV"])
-    df_train = df_train.merge(split_df, on='Image_ID', how='left')
-    initialize_WBC_kde(df_train[df_train['Split'] == CONFIG["fold_num"]])
+    if "SPLIT_CSV" in CONFIG:
+        split_df = pd.read_csv(CONFIG["SPLIT_CSV"])
+        df_train = df_train.merge(split_df, on='Image_ID', how='left')
+        initialize_WBC_kde(df_train[df_train['Split'] == CONFIG["fold_num"]])
+    else:
+        initialize_WBC_kde(df_train)
     # Filter WBC data only
     df_wbc = df[df['class'] == 'WBC'].copy()
     kde_density_wbc = cached_kde_wbc.evaluate(df_wbc[['norm_center_x', 'norm_center_y']].T)
