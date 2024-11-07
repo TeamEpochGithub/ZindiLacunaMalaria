@@ -1,11 +1,10 @@
+import pandas as pd
 from dataclasses import dataclass
 from typing import Optional
-
+from tqdm import tqdm
 import numpy as np
-import pandas as pd
 
-
-@dataclass
+@dataclass 
 class Box:
     x1: int | float
     y1: int | float
@@ -14,6 +13,10 @@ class Box:
     confidence: float
     class_name: str
     model_index: Optional[int] = None
+
+    def __eq__(self, other):
+        return self.x1 == other.x1 and self.y1 == other.y1 and self.x2 == other.x2 and self.y2 == other.y2 and self.class_name == other.class_name
+
 
 
 @dataclass
@@ -38,35 +41,43 @@ def _find_iou(box1: Box, box2: Box) -> float:
     return intersection / float(union)
 
 
+class DualEnsemble:
+    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, **kwargs):
+        self.ensembles = [Ensemble(form, iou_threshold, conf_threshold, threshold_type='lower', **kwargs), Ensemble(form, iou_threshold, conf_threshold, threshold_type='upper', **kwargs)]
+
+    def __call__(self, preds: list[pd.DataFrame]) -> pd.DataFrame:
+        lower_preds = self.ensembles[0](preds)
+        upper_preds = self.ensembles[1](preds)
+        preds = pd.concat([lower_preds, upper_preds])
+        return preds
+
+
 class Ensemble:
     classes = ['WBC', 'Trophozoite']
-
-    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, **kwargs):
+    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, threshold_type: str, **kwargs):
         self.form = form
         self.iou_threshold = iou_threshold
         self.conf_threshold = conf_threshold
+        self.threshold_type = threshold_type
         self.params = kwargs
+        self.n_models = None
 
     def __call__(self, preds: list[pd.DataFrame]) -> pd.DataFrame:
+        self.n_models = len(preds)
         image_predictions = [self._to_image_predictions(pred, i) for i, pred in enumerate(preds)]
         groups = self._find_groups(image_predictions)
-        reduced_groups = {img_id: [self._reduce_group(group) for group in groups[img_id]] for img_id in groups}
-        df_final = self._to_df(reduced_groups)
-
-        # Reorder the columns to match the input preds
-        column_order = [col for col in preds[0].columns]
-        df_final = df_final[column_order]
-
-        df_final = self._add_neg_images(df_final)
-
-        return df_final
-
-    def _to_df(self, reduced_groups: dict[str, list[Box]]) -> pd.DataFrame:
+        for img_id in groups:
+            post_reduce_boxes = []
+            for group in groups[img_id]:
+                post_reduce_boxes.extend(self._reduce_group(group))
+            groups[img_id] = post_reduce_boxes
+        return self._to_df(groups)
+    
+    def _to_df(self, post_reduce_boxes: dict[str, list[Box]]) -> pd.DataFrame:
         rows = []
-        for img_id, boxes in reduced_groups.items():
+        for img_id, boxes in post_reduce_boxes.items():
             for box in boxes:
-                rows.append({'Image_ID': img_id, 'xmin': box.x1, 'ymin': box.y1, 'xmax': box.x2, 'ymax': box.y2,
-                             'confidence': box.confidence, 'class': box.class_name})
+                rows.append({'Image_ID': img_id, 'xmin': box.x1, 'ymin': box.y1, 'xmax': box.x2, 'ymax': box.y2, 'confidence': box.confidence, 'class': box.class_name})
         return pd.DataFrame(rows)
 
     def _to_image_predictions(self, pred: pd.DataFrame, model_index: int) -> dict[str, ImagePrediction]:
@@ -75,12 +86,14 @@ class Ensemble:
             boxes_df = pred[pred['Image_ID'] == img_id]
             boxes = []
             for _, box in boxes_df.iterrows():
-                if box.confidence < self.conf_threshold:
+                if self.threshold_type == 'lower' and box.confidence < self.conf_threshold:
+                    continue
+                elif self.threshold_type == 'upper' and box.confidence > self.conf_threshold:
                     continue
                 boxes.append(Box(box.xmin, box.ymin, box.xmax, box.ymax, box.confidence, box['class'], model_index))
             image_predictions[img_id] = ImagePrediction(boxes)
         return image_predictions
-
+    
     def _find_groups_in_image(self, image_predictions: list[ImagePrediction]) -> list[Group]:
         groups = []
         for class_name in self.classes:
@@ -103,40 +116,62 @@ class Ensemble:
                 all_boxes = [box for i, box in enumerate(all_boxes) if i not in box_indices]
         return groups
 
+
     def _find_groups(self, preds: list[dict[str, ImagePrediction]]) -> dict[str, list[Group]]:
         image_ids = list(preds[0].keys())
         groups = {img_id: [] for img_id in image_ids}
         for img_id in image_ids:
             groups[img_id] = self._find_groups_in_image([pred[img_id] for pred in preds])
         return groups
-
-    def _reduce_group(self, group: Group) -> Box:
+    
+    def _reduce_group(self, group: Group) -> Group:
         if self.form == "nms":
-            return self._nms(group)
+            return [self._nms(group)]
         elif self.form == "wbf":
-            return self._weighted_boxes_fusion(group)
-        raise ValueError(f"Unknown form: {self.form}")
-
+            return [self._weighted_boxes_fusion(group)]
+        elif self.form == "soft_nms":
+            return self._soft_nms(group)
+        elif self.form == "voting":
+            return self._voting(group)
+        else:
+            raise ValueError(f"Unknown form: {self.form}")
+    
     def _nms(self, group: Group) -> Box:
         return max(group, key=lambda box: box.confidence)
-
+    
+    def _soft_nms(self, group: Group) -> Group:
+        # I don't expect much from this, it doesn't seem like an ensembling technique, or something that applies to our case
+        base_box = self._nms(group)
+        for box in group:
+            if box == base_box:
+                continue
+            iou = _find_iou(box, base_box)
+            box.confidence *= 1 - iou
+        return group
+    
+    def _voting(self, group: Group) -> Group:
+        if sum(len(set([box.model_index for box in group]))) > .5 * self.n_models:
+            return [self._nms(group)]
+        else:
+            return []
+    
     def _weighted_boxes_fusion(self, group: Group) -> Box:
         x1 = np.array([box.x1 for box in group])
         y1 = np.array([box.y1 for box in group])
         x2 = np.array([box.x2 for box in group])
         y2 = np.array([box.y2 for box in group])
         confidences = np.array([box.confidence for box in group])
-
+        
         # Calculate the weighted average of the box coordinates
         x1_avg = np.average(x1, weights=confidences)
         y1_avg = np.average(y1, weights=confidences)
         x2_avg = np.average(x2, weights=confidences)
         y2_avg = np.average(y2, weights=confidences)
-
+        
         # calculate confidence score
         n_models = len(self.params['weights'])
         model_ids = [box.model_index for box in group]
-        reduction_method = self.params.get('wbf_reduction', 'mean')
+        reduction_method = self.params.get('wbf_reduction')
         if reduction_method == 'mean':
             conf = 0
             for confidence, model_id in zip(confidences, model_ids):
@@ -164,63 +199,20 @@ class Ensemble:
             confidence=float(conf),
             class_name=group[0].class_name,
         )
-
+        
         return fused_box
+        
+            
 
-    def _add_neg_images(self, df,
-                        neg_preds_path: str = '/home/epochvpc6/PycharmProjects/ZindiLacunaMalaria/data/neg_preds.csv'):
-        neg_df = pd.read_csv(neg_preds_path)
-
-        is_neg_df = neg_df[neg_df['prediction'] == 'NEG']
-        not_neg_df = neg_df[neg_df['prediction'] == 'NON_NEG']
-
-        # print(len(neg_df), len(not_neg_df))
-
-        # Remove the entries from the original DataFrame that are NEG
-        df = df[df['Image_ID'].isin(not_neg_df['file_name'].unique())]
-
-        # Create a new DataFrame with the required columns and values for negative predictions
-        neg_rows = []
-        for image_id in is_neg_df['file_name'].unique():
-            neg_rows.append({
-                'Image_ID': image_id,
-                'class': 'NEG',
-                'confidence': 1.0,
-                'xmin': 0,
-                'ymin': 0,
-                'xmax': 0,
-                'ymax': 0
-            })
-        neg_df_new = pd.DataFrame(neg_rows)
-
-        df = pd.concat([df, neg_df_new], ignore_index=True)
-
-        return df
-
-
-# if __name__ == "__main__":
-#     # ensemble = Ensemble(form="nms", iou_threshold=0.5)
-#     ensemble = Ensemble(form="wbf", iou_threshold=0.8, conf_threshold=0.05, weights=[1, 1], wbf_reduction='mean')
-#     file1 = pd.read_csv('../data/best_swept_cv_8678.csv')
-#     file2 = pd.read_csv('../data/processed_predictions_new.csv')
-#     img_ids = file1['Image_ID'].unique().tolist()
-#     file1 = file1[file1['Image_ID'].isin(img_ids)]
-#     file2 = file2[file2['Image_ID'].isin(img_ids)]
-#     files = [file1, file2]
-#     ensembled = ensemble(files)
-#     ensembled.to_csv('ensembled.csv', index=False)
-#
-#     # Print the head of the ensembled DataFrame
-#     print(ensembled.head())
-#
-#     # Get the unique image IDs in the ensembled DataFrame
-#     ensembled_image_ids = ensembled['Image_ID'].unique()
-#
-#     # Get the unique image IDs in the other DataFrames
-#     file1_image_ids = file1['Image_ID'].unique()
-#     file2_image_ids = file2['Image_ID'].unique()
-#
-#     # Print the length of the unique image IDs
-#     print(f"Number of unique image IDs in ensembled: {len(ensembled_image_ids)}")
-#     print(f"Number of unique image IDs in file1: {len(file1_image_ids)}")
-#     print(f"Number of unique image IDs in file2: {len(file2_image_ids)}")
+if __name__ == "__main__":
+    # ensemble = Ensemble(form="nms", iou_threshold=0.5)
+    ensemble = Ensemble(form="wbf", iou_threshold=0.5, conf_threshold=0.1, weights=[1, 1], wbf_reduction='mean')
+    file1 = pd.read_csv('predictions1.csv')
+    file2 = pd.read_csv('predictions2.csv')
+    img_ids = file1['Image_ID'].unique().tolist()[:100]
+    file1 = file1[file1['Image_ID'].isin(img_ids)]
+    file2 = file2[file2['Image_ID'].isin(img_ids)]
+    files = [file1, file2]
+    ensembled = ensemble(files)
+    ensembled.to_csv('ensembled.csv', index=False)
+    print(ensembled.head())
