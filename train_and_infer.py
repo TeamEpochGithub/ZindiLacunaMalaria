@@ -8,10 +8,10 @@ from preprocessing.filter_boxes import get_filtered_train_df
 from training.yolo.train_yolo_models import get_trained_yolo_models
 
 # --- PREPROCESSING ---
-train_df = pd.read_csv('data/csv_files/Train.csv')
+# train_df = pd.read_csv('data/csv_files/Train.csv')
 
 # Remove double boxes from the labels
-filtered_train_df = get_filtered_train_df(train_df, iou_threshold=0.3)
+# filtered_train_df = get_filtered_train_df(train_df, iou_threshold=0.3)
 
 # Generate the YOLO dataset, ignoring the NEG labels
 # save_dataset_in_yolo('data/img', filtered_train_df, 'data/yolo_ds')
@@ -22,6 +22,7 @@ yolo_models = get_trained_yolo_models(
     glob.glob('config_files/yolo_train_config_files/*.yaml'),
     'data/yolo_ds/dataset.yaml'
 )
+# FIXME: make these 2 return a model, yolo just loads one and detr is not exist
 detr_models = [None]
 
 # --- INFERENCE ---
@@ -45,4 +46,5 @@ for model in detr_models:
 os.makedirs('data/predictions', exist_ok=True)
 for model_name, preds in final_preds.items():
     for i, df in enumerate(preds):
-        df.to_csv(f'data/predictions/{model_name[:3]}_predictions_{i+1}.csv', index=False)
+        os.makedirs(f'data/predictions/{model_name[:3]}', exist_ok=True)
+        df.to_csv(f'data/predictions/{model_name[:3]}/predictions_{i+1}.csv', index=False)

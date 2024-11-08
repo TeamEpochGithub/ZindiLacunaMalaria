@@ -150,7 +150,7 @@ class Ensemble:
         return group
     
     def _voting(self, group: Group) -> Group:
-        if sum(len(set([box.model_index for box in group]))) > .5 * self.n_models:
+        if len(set([box.model_index for box in group])) > .5 * self.n_models:
             return [self._nms(group)]
         else:
             return []
