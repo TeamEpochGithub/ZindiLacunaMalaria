@@ -1,6 +1,6 @@
 
 # Program and Method Configuration
-program: postprocessing/class_specific_sweep.py
+program: cv_sweep/postprocess.py
 method: bayes
 
 # Metric Configuration
@@ -97,6 +97,120 @@ parameters:
 
   output_path:
     value: "submissions/ensemble_results.csv"
+
+
+
+  #  ============================
+  # Ensemble YOLO tta Parameters - Trophozoite
+  # ============================
+  postprocessing_ensemble_ttayolo_Trophozoite_form:
+    distribution: categorical
+    values: ["nms", "wbf", "soft_nms"]
+
+  postprocessing_ensemble_ttayolo_Trophozoite_wbf_reduction:
+    distribution: categorical
+    values: ["mean", "median", "max", "min", "mean_no_rescale", "random"]
+
+  postprocessing_ensemble_ttayolo_Trophozoite_nms_iou_threshold:
+    distribution: uniform
+    min: 0.5
+    max: 0.85
+
+  postprocessing_ensemble_ttayolo_Trophozoite_wbf_iou_threshold:
+    distribution: uniform
+    min: 0.5
+    max: 0.85
+
+  postprocessing_ensemble_ttayolo_Trophozoite_wbf_conf_threshold:
+    distribution: uniform
+    min: 0.01
+    max: 0.4
+
+  # ============================
+  # Ensemble YOLO tta Parameters - WBC
+  # ============================
+  postprocessing_ensemble_ttayolo_WBC_form:
+    distribution: categorical
+    values: ["nms", "wbf", "soft_nms"]
+
+  postprocessing_ensemble_ttayolo_WBC_wbf_reduction:
+    distribution: categorical
+    values: ["mean", "median", "max", "min", "mean_no_rescale", "random"]
+
+  postprocessing_ensemble_ttayolo_WBC_nms_iou_threshold:
+    distribution: uniform
+    min: 0.5
+    max: 0.85
+
+  postprocessing_ensemble_ttayolo_WBC_wbf_iou_threshold:
+    distribution: uniform
+    min: 0.5
+    max: 0.85
+
+  postprocessing_ensemble_ttayolo_WBC_wbf_conf_threshold:
+    distribution: uniform
+    min: 0.01
+    max: 0.3
+
+
+
+
+
+
+  #  ============================
+  # Ensemble DETR tta Parameters - Trophozoite
+  # ============================
+  postprocessing_ensemble_ttadetr_Trophozoite_form:
+    distribution: categorical
+    values: ["nms", "wbf", "soft_nms"]
+
+  postprocessing_ensemble_ttadetr_Trophozoite_wbf_reduction:
+    distribution: categorical
+    values: ["mean", "median", "max", "min", "mean_no_rescale", "random"]
+
+  postprocessing_ensemble_ttadetr_Trophozoite_nms_iou_threshold:
+    distribution: uniform
+    min: 0.5
+    max: 0.85
+
+  postprocessing_ensemble_ttadetr_Trophozoite_wbf_iou_threshold:
+    distribution: uniform
+    min: 0.5
+    max: 0.85
+
+  postprocessing_ensemble_ttadetr_Trophozoite_wbf_conf_threshold:
+    distribution: uniform
+    min: 0.01
+    max: 0.4
+
+  # ============================
+  # Ensemble DETR tta Parameters - WBC
+  # ============================
+  postprocessing_ensemble_ttadetr_WBC_form:
+    distribution: categorical
+    values: ["nms", "wbf", "soft_nms"]
+
+  postprocessing_ensemble_ttadetr_WBC_wbf_reduction:
+    distribution: categorical
+    values: ["mean", "median", "max", "min", "mean_no_rescale", "random"]
+
+  postprocessing_ensemble_ttadetr_WBC_nms_iou_threshold:
+    distribution: uniform
+    min: 0.5
+    max: 0.85
+
+  postprocessing_ensemble_ttadetr_WBC_wbf_iou_threshold:
+    distribution: uniform
+    min: 0.5
+    max: 0.85
+
+  postprocessing_ensemble_ttadetr_WBC_wbf_conf_threshold:
+    distribution: uniform
+    min: 0.01
+    max: 0.3
+
+
+
 
   # ============================
   # DETR Processing Parameters - Trophozoite

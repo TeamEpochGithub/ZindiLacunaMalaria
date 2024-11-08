@@ -170,6 +170,27 @@ def remove_bbox_near_edges(df, data_dir, edge_threshold=0.1, border_threshold=20
 
     df = df[df.apply(check_bbox_on_boundary, axis=1)]
     return df
+def apply_confidence_threshold(df, threshold):
+    return df[df['confidence'] >= threshold]
+def delete_sharp_aspect_ratio(df, upper_aspect_ratio_threshold=2, lower_aspect_ratio_threshold=0.5):
+    """
+    Delete bounding boxes with sharp aspect ratios while ensuring at least one prediction per image
+    """
+    df = df.copy()
+    
+    # Calculate aspect ratio
+    aspect_ratio = (df['xmax'] - df['xmin']) / (df['ymax'] - df['ymin'])
+    
+    # Create mask for valid aspect ratios
+    mask = (aspect_ratio < upper_aspect_ratio_threshold) & (aspect_ratio > lower_aspect_ratio_threshold)
+    
+    # Group by image and check if we would remove all predictions
+    would_remove_all = df.groupby('Image_ID')['Image_ID'].transform(lambda x: (~mask[x.index]).all())
+    
+    # Keep predictions even if they violate aspect ratio if they're the only ones for that image
+    final_mask = mask | would_remove_all
+    
+    return df[final_mask]
 
 def basic_postprocess(df, data_dir, neg_csv, test_csv):
     # submission_df = add_img_shape_column(data_dir, df)
@@ -299,102 +320,47 @@ def spatial_density_contour_wbc(
     return df
 
 
-
 def postprocessing_pipeline(CONFIG, df=None):
     """Run postprocessing pipeline with the given configuration. If a dataframe is provided, it will be used as input. Otherwise, the input CSV file will be read."""
-    # Unpack flags
-    use_size_adjustment = CONFIG.get('use_size_adjustment', False)
-    use_remove_edges = CONFIG.get('use_remove_edges', False)
-    use_spatial_density_troph = CONFIG.get('use_spatial_density_troph', False)
-    use_spatial_density_wbc = CONFIG.get('use_spatial_density_wbc', False)
-
-    # Unpack parameters
-    size_factor_troph = CONFIG.get('size_factor_troph')
-    size_factor_wbc = CONFIG.get('size_factor_wbc')
+    # Unpack flags and parameters from CONFIG
+    flags = ['use_size_adjustment', 'use_remove_edges', 'use_spatial_density_troph', 'use_spatial_density_wbc']
+    params = {key: CONFIG.get(key) for key in CONFIG.keys() if key not in flags}
     
-    edge_threshold = CONFIG.get('edge_threshold')
-    border_threshold = CONFIG.get('border_threshold')
-    option_troph = CONFIG.get('option_troph')
-    option_wbc = CONFIG.get('option_wbc')
-    
-    # Parameters for spatial_density_contour_troph
-    base_adjustment_troph = CONFIG.get('base_adjustment_troph')
-    density_multiplier_troph = CONFIG.get('density_multiplier_troph')
-    percentile_low_troph = CONFIG.get('percentile_low_troph')
-    percentile_high_troph = CONFIG.get('percentile_high_troph')
-    low_density_adjustment_troph = CONFIG.get('low_density_adjustment_troph')
-    high_density_adjustment_troph = CONFIG.get('high_density_adjustment_troph')
-    log_scale_factor_troph = CONFIG.get('log_scale_factor_troph')
-    expit_scale_troph = CONFIG.get('expit_scale_troph')
-    adjustment_range_low_troph = CONFIG.get('adjustment_range_low_troph')
-    adjustment_range_high_troph = CONFIG.get('adjustment_range_high_troph')
-
-    # Parameters for spatial_density_contour_wbc
-    base_adjustment_wbc = CONFIG.get('base_adjustment_wbc')
-    density_multiplier_wbc = CONFIG.get('density_multiplier_wbc')
-    percentile_low_wbc = CONFIG.get('percentile_low_wbc')
-    percentile_high_wbc = CONFIG.get('percentile_high_wbc')
-    low_density_adjustment_wbc = CONFIG.get('low_density_adjustment_wbc')
-    high_density_adjustment_wbc = CONFIG.get('high_density_adjustment_wbc')
-    log_scale_factor_wbc = CONFIG.get('log_scale_factor_wbc')
-    expit_scale_wbc = CONFIG.get('expit_scale_wbc')
-    adjustment_range_low_wbc = CONFIG.get('adjustment_range_low_wbc')
-    adjustment_range_high_wbc = CONFIG.get('adjustment_range_high_wbc')
-
     # Read initial data
     if df is None:
         df = pd.read_csv(CONFIG['INPUT_CSV'])
-    
     train_df = pd.read_csv(CONFIG['TRAIN_CSV'])
-
+    
     # Process bounding boxes
     df = process_df_bbox(df, CONFIG['DATA_DIR'])
     train_df = process_df_bbox(train_df, CONFIG['DATA_DIR'])
-
     df = basic_postprocess(df, CONFIG['DATA_DIR'], CONFIG['NEG_CSV'], CONFIG['TEST_CSV'])
-   
-    # Optional: Size adjustment
-    if use_size_adjustment:
-        df = factor_bbox_size_change(df, size_factor_troph, size_factor_wbc)
+    
+    # Apply processing steps based on flags
+    if CONFIG.get('use_size_adjustment', False):
+        df = factor_bbox_size_change(df, params['size_factor_troph'], params['size_factor_wbc'])
+    if CONFIG.get('use_remove_edges', False):
+        df = remove_bbox_near_edges(df, CONFIG['DATA_DIR'], params['edge_threshold'], params['border_threshold'])
+    
+    # Apply spatial density contour adjustments
+    for key, fn in [('use_spatial_density_troph', spatial_density_contour_troph), ('use_spatial_density_wbc', spatial_density_contour_wbc)]:
+        if CONFIG.get(key, False):
+            df = fn(
+                df, train_df, CONFIG, params[f'option_{key.split("_")[-1]}'],
+                base_adjustment=params[f'base_adjustment_{key.split("_")[-1]}'],
+                density_multiplier=params[f'density_multiplier_{key.split("_")[-1]}'],
+                percentile_low=params[f'percentile_low_{key.split("_")[-1]}'],
+                percentile_high=params[f'percentile_high_{key.split("_")[-1]}'],
+                low_density_adjustment=params[f'low_density_adjustment_{key.split("_")[-1]}'],
+                high_density_adjustment=params[f'high_density_adjustment_{key.split("_")[-1]}'],
+                log_scale_factor=params[f'log_scale_factor_{key.split("_")[-1]}'],
+                expit_scale=params[f'expit_scale_{key.split("_")[-1]}'],
+                adjustment_range_low=params[f'adjustment_range_low_{key.split("_")[-1]}'],
+                adjustment_range_high=params[f'adjustment_range_high_{key.split("_")[-1]}']
+            )
+    
+    return df[['Image_ID', 'class', 'confidence', 'ymin', 'xmin', 'ymax', 'xmax']]
 
-    # Optional: Remove bounding boxes near edges
-    if use_remove_edges:
-        df = remove_bbox_near_edges(df, CONFIG['DATA_DIR'], edge_threshold, border_threshold)
-
-    # Optional: Apply spatial density contour for Trophozoite
-    if use_spatial_density_troph:
-        df = spatial_density_contour_troph(
-            df, train_df, CONFIG, option_troph,
-            base_adjustment=base_adjustment_troph,
-            density_multiplier=density_multiplier_troph,
-            percentile_low=percentile_low_troph,
-            percentile_high=percentile_high_troph,
-            low_density_adjustment=low_density_adjustment_troph,
-            high_density_adjustment=high_density_adjustment_troph,
-            log_scale_factor=log_scale_factor_troph,
-            expit_scale=expit_scale_troph,
-            adjustment_range_low=adjustment_range_low_troph,
-            adjustment_range_high=adjustment_range_high_troph
-        )
-
-    # Optional: Apply spatial density contour for WBC
-    if use_spatial_density_wbc:
-        df = spatial_density_contour_wbc(
-            df, train_df, CONFIG, option_wbc,
-            base_adjustment=base_adjustment_wbc,
-            density_multiplier=density_multiplier_wbc,
-            percentile_low=percentile_low_wbc,
-            percentile_high=percentile_high_wbc,
-            low_density_adjustment=low_density_adjustment_wbc,
-            high_density_adjustment=high_density_adjustment_wbc,
-            log_scale_factor=log_scale_factor_wbc,
-            expit_scale=expit_scale_wbc,
-            adjustment_range_low=adjustment_range_low_wbc,
-            adjustment_range_high=adjustment_range_high_wbc
-        )
-
-    df = df[['Image_ID', 'class', 'confidence', 'ymin', 'xmin', 'ymax', 'xmax']]
-    return df
 
 
 
@@ -455,14 +421,14 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
                 form='nms',
                 iou_threshold=class_config['nms_iou_threshold'],
                 classes=[class_name],
-                conf_threshold=0.0
+                conf_threshold=0.01
             )
         elif class_config['form'] == 'soft_nms':
             ensemble = DualEnsemble(
                 form='soft_nms',
                 iou_threshold=class_config['nms_iou_threshold'],
                 classes=[class_name],
-                conf_threshold=0.0
+                conf_threshold=0.01
             )
             
         # Process class predictions

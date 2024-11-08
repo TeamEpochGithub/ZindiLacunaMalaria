@@ -1,22 +1,21 @@
+import glob
 import os
-import argparse
+
 import numpy as np
 import pandas as pd
 import wandb
 import yaml
-from pathlib import Path
-from postprocessing.postprocess import postprocessing_pipeline, ensemble_class_specific_pipeline, apply_confidence_threshold
-from util.wbf import weighted_boxes_fusion_df
+from scipy.stats import describe
+from tqdm import tqdm
+
+from postprocessing.ensemble import DualEnsemble
+from util.save import save_with_negs
 from util.mAP_zindi import mAP_zindi_calculation
-from util.ensemble import DualEnsemble, Ensemble
+from postprocessing.postprocess import postprocessing_pipeline, ensemble_class_specific_pipeline
 import concurrent.futures
 import logging
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 def score_on_validation_set(df, fold_num, split_csv, train_csv):
-    logging.info(f"Scoring on validation set for fold {fold_num}")
     df = df.copy()
     folds_df = pd.read_csv(split_csv)
     train_df = pd.read_csv(train_csv)
@@ -26,11 +25,9 @@ def score_on_validation_set(df, fold_num, split_csv, train_csv):
 
     pred_df = df[df['Image_ID'].isin(val_imgs)]
     df_val = train_df[train_df['Image_ID'].isin(val_imgs)]
-    logging.info(f"Number of images in validation set: {len(val_imgs)}")
-    logging.info(f"Number of predictions in prediction set: {len(pred_df)}")
-    
+    print(f"Number of images in validation set: {len(val_imgs)}")
+    print(f"Number of predictions in prediction set: {len(pred_df)}")
     map_score, ap_dict, lamr_dict = mAP_zindi_calculation(df_val, pred_df)
-    logging.info(f"Completed scoring for fold {fold_num}")
    
     return map_score, ap_dict, lamr_dict
 
@@ -48,6 +45,8 @@ def create_structured_config(wandb_config):
     config = {
         'input': {},
         'postprocessing': {
+            'ensemble_ttayolo': {},
+            'ensemble_ttadetr': {},
             'individual_detr': {},
             'individual_yolo11': {},
             'individual_yolo9': {},
@@ -99,9 +98,19 @@ def create_structured_config(wandb_config):
     logging.info("Structured config created successfully")
     return config
 
+        
 
-def run_fold(config, fold_num, yolo11_cv_files, yolo9_cv_files, detr_cv_files):
+
+def run_fold(config, fold_num, yolo11_cv_files, detr_cv_files):
     logging.info(f"Running fold {fold_num}")
+# Track metrics
+    cv_metrics = {
+        "mAP": [],
+        "AP_troph": [],
+        "AP_WBC": [],
+        "lamr_troph": [],
+        "lamr_WBC": []
+    }
 
     def create_pipeline_config(stage_config, base_paths):
         pipeline_config = {
@@ -131,116 +140,106 @@ def run_fold(config, fold_num, yolo11_cv_files, yolo9_cv_files, detr_cv_files):
     try:
         # Process YOLO predictions
         yolo_dfs = []
-    
-        # Process YOLO11
-        logging.info(f"Processing YOLO11 predictions for fold {fold_num}")
-        yolo_df = pd.read_csv(os.path.join(config['input']['yolo11_csv_dir'], yolo11_cv_files[fold_num - 1]))
-        yolo_pipeline_config = create_pipeline_config(
+        for tta_flip in range(len(yolo11_cv_files[fold_num - 1])):
+            yolo_df = pd.read_csv(yolo11_cv_files[fold_num - 1][tta_flip])
+            yolo_dfs.append(yolo_df)
+        yolo_tta_config = create_pipeline_config(
+            config['postprocessing']['ensemble_tta_yolo'],
+            config['input']
+        )
+        yolo_tta_df = ensemble_class_specific_pipeline(CONFIG=yolo_tta_config, df_list=yolo_dfs, weight_list=[1, 1, 1, 1])
+
+        yolo_individual_config = create_pipeline_config(
             config['postprocessing']['individual_yolo11'],
             config['input']
         )
-        yolo_df = postprocessing_pipeline(yolo_pipeline_config, yolo_df)
-        yolo_dfs.append(yolo_df)
-        logging.info(f"Completed YOLO11 processing for fold {fold_num}")
+        yolo_tta_df = postprocessing_pipeline(yolo_individual_config, yolo_tta_df)
 
-        # Process YOLO9 if available
-        if 'yolo9_csv_dir' in config['input']:
-            logging.info(f"Processing YOLO9 predictions for fold {fold_num}")
-            yolo_df = pd.read_csv(os.path.join(config['input']['yolo9_csv_dir'], yolo9_cv_files[fold_num - 1]))
-            yolo_df = apply_confidence_threshold(yolo_df, 0.1)
-            yolo_pipeline_config = create_pipeline_config(
-                config['postprocessing']['individual_yolo9'],
-                config['input']
-            )
-            yolo_df = postprocessing_pipeline(yolo_pipeline_config, yolo_df)
-            
-            yolo_dfs.append(yolo_df)
-            logging.info(f"Completed YOLO9 processing for fold {fold_num}")
 
-        # Ensemble YOLO predictions if multiple files
-        if len(yolo_dfs) > 1:
-            logging.info(f"Ensembling YOLO predictions for fold {fold_num}")
-            yolo_ensemble_config = create_pipeline_config(
-                config['postprocessing']['ensemble_yolo'],
-                config['input']
-            )
-            yolo_weights = [[config['troph_weights']['yolo11_weight'], config['troph_weights']['yolo9_weight']],
-                            [config['wbc_weights']['yolo11_weight'], config['wbc_weights']['yolo9_weight']]]
-            yolo_df_all = ensemble_class_specific_pipeline(
-                CONFIG=yolo_ensemble_config,
-                df_list=yolo_dfs,
-                weight_list=yolo_weights
-            )
-            logging.info(f"Completed YOLO ensembling for fold {fold_num}")
-        else:
-            yolo_df_all = yolo_dfs[0]
-
-        # Process DETR predictions
-        logging.info(f"Processing DETR predictions for fold {fold_num}")
-        detr_file = os.path.join(config['input']['detr_csv_dir'], detr_cv_files[fold_num - 1])
+            # Process DETR predictions
+        detr_file = detr_cv_files[fold_num - 1]
         detr_df = pd.read_csv(detr_file)
         detr_pipeline_config = create_pipeline_config(
             config['postprocessing']['individual_detr'],
             config['input']
         )
         detr_df = postprocessing_pipeline(detr_pipeline_config, detr_df)
-        logging.info(f"Completed DETR processing for fold {fold_num}")
+        # Apply DETR weight to confidence scores
 
+        
         # Final ensemble
-        logging.info(f"Running final ensemble for fold {fold_num}")
+        
         final_pipeline_config = create_pipeline_config(
             config['postprocessing']['ensemble_all'],
             config['input']
         )
-        final_weights = [[config['troph_weights']['yolo_weight'], config['troph_weights']['detr_weight']],
-                         [config['wbc_weights']['yolo_weight'], config['wbc_weights']['detr_weight']]]
-        all_df = ensemble_class_specific_pipeline(
-            CONFIG=final_pipeline_config,
-            df_list=[yolo_df_all, detr_df],
-            weight_list=final_weights
-        )
-        logging.info(f"Completed final ensemble for fold {fold_num}")
+        all_df = ensemble_class_specific_pipeline(CONFIG=final_pipeline_config, df_list=[yolo_tta_df, detr_df], weight_list=[config['yolo_weight'], config['detr_weight']])
 
         # Calculate metrics
-        logging.info(f"Calculating metrics for fold {fold_num}")
         map_score, ap_dict, lamr_dict = score_on_validation_set(
             df=all_df,
             fold_num=fold_num,
             split_csv=config['input']['SPLIT_CSV'],
             train_csv=config['input']['TRAIN_CSV']
         )
-        logging.info(f"Metrics calculated for fold {fold_num}")
+        
+        
+        # Calculate and log mean metrics
+        mean_metrics = {k: np.mean(v) for k, v in cv_metrics.items()}
+        wandb.log(mean_metrics)
+        
+        # Save best configuration
+        if mean_metrics['mAP'] > wandb.run.summary.get('best_AP_mean', 0):
+            wandb.run.summary['best_AP_mean'] = mean_metrics['mAP']
+            best_config_path = os.path.join(wandb.run.dir, 'best_config.yaml')
+            with open(best_config_path, 'w') as f:
+                yaml.dump(config, f)
+        
+        # Store metrics
+        print(f"Fold {fold_num} metrics:")
+        print(f"mAP: {map_score}")
+        print(f"AP: {ap_dict}")
+        print(f"LAMR: {lamr_dict}")
+        cv_metrics["mAP"].append(map_score)
+        cv_metrics["AP_troph"].append(ap_dict['Trophozoite'])
+        cv_metrics["AP_WBC"].append(ap_dict['WBC'])
+        cv_metrics["lamr_troph"].append(lamr_dict['Trophozoite'])
+        cv_metrics["lamr_WBC"].append(lamr_dict['WBC'])
 
-        return {
-            "fold_num": fold_num,
-            "mAP": map_score,
-            "AP_troph": ap_dict['Trophozoite'],
-            "AP_WBC": ap_dict['WBC'],
-            "lamr_troph": lamr_dict['Trophozoite'],
-            "lamr_WBC": lamr_dict['WBC']
-        }
 
-    except Exception as e:
-        logging.error(f"Error occurred during fold {fold_num}: {e}")
-        raise
+        # Early stopping check on fold 1
+        if fold_num == 1 and map_score < 0.86:
+            print(f"Early stopping: Fold 1 mAP ({map_score:.4f}) below threshold")
+            wandb.log({
+                "mAP": map_score,
+                "AP_troph": ap_dict['Trophozoite'],
+                "AP_WBC": ap_dict['WBC'],
+                "lamr_troph": lamr_dict['Trophozoite'],
+                "lamr_WBC": lamr_dict['WBC'],
+                "early_stopped": True,
+                "completed_folds": 1
+            })
+            return  # Exit this trial and move to next wandb suggestion
+    except:
+        logging.exception(f"Error running fold {fold_num}")
 
 
 def run_experiment(config_file):
     # Initialize wandb
-    with wandb.init() as run:
+    with wandb.init(project="final_pp_sweep") as run:
         # Load base config and update with wandb parameters
         logging.info(f"Running experiment with config file: {config_file}")
         base_config = load_yaml_config(config_file)
         config = create_structured_config(wandb.config)
 
-        # Cross-validation files
-        detr_cv_files = ['fold_1.csv', 'fold_2.csv', 'fold_3.csv', 'fold_4.csv', 'fold_5.csv']
-        yolo11_cv_files = ['77_val.csv', '79_val.csv', '81_val.csv', '84_val.csv', '87_val.csv']
-        yolo9_cv_files = ['fold_1.csv', 'fold_2.csv', 'fold_3.csv', 'fold_4.csv', 'fold_5.csv']
+        print(config)
 
+        # Cross-validation files
+        detr_cv_files = [""]   #TODO: fix this
+        yolo11_cv_files = [["","","",""], ["","","",""], ["","","",""], ["","","",""], ["","","",""]]#5 folds with 4 tta
         # Run cross-validation folds in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(run_fold, config, i, yolo11_cv_files, yolo9_cv_files, detr_cv_files) for i in range(1, 6)]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            futures = [executor.submit(run_fold, config, i, yolo11_cv_files, detr_cv_files) for i in range(1, 6)]
             results = [future.result() for future in concurrent.futures.as_completed(futures)]
 
         # Track metrics
@@ -279,7 +278,7 @@ def run_experiment(config_file):
 
 def run_multiple_experiments(config_files):
     # Run multiple experiments in parallel
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         futures = [executor.submit(run_experiment, config_file) for config_file in config_files]
         concurrent.futures.wait(futures)
 
