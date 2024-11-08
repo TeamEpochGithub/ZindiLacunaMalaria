@@ -398,7 +398,7 @@ def postprocessing_pipeline(CONFIG, df=None):
 
 
 
-def ensemble_pipeline(CONFIG, df_list, weight_list):#create flag for dual ensemble 
+def ensemble_pipeline(CONFIG, df_list, weight_list, classes=["Trophozoite", "WBC"]):#create flag for dual ensemble 
     """Run ensemble pipeline on a list of dataframes. Using nms,wbf or soft-nms. specify conf and iou thresholds+wbf_reduction"""
     form = CONFIG.get('form', 'wbf')
     nms_iou_threshold = CONFIG.get('nms_iou_threshold')
@@ -407,18 +407,71 @@ def ensemble_pipeline(CONFIG, df_list, weight_list):#create flag for dual ensemb
     wbf_reduction = CONFIG.get('wbf_reduction')
     # print(form, nms_iou_threshold, wbf_iou_threshold, wbf_conf_threshold, wbf_reduction)
     if form =='wbf':
-        ensemble = DualEnsemble(form=form, iou_threshold=wbf_iou_threshold, conf_threshold=wbf_conf_threshold, weights=weight_list, wbf_reduction=wbf_reduction)
+        ensemble = DualEnsemble(form=form, iou_threshold=wbf_iou_threshold,classes=classes, conf_threshold=wbf_conf_threshold, weights=weight_list, wbf_reduction=wbf_reduction)
     elif form == 'nms':
-        ensemble = DualEnsemble(form=form, iou_threshold=nms_iou_threshold, conf_threshold=0.0)
+        ensemble = DualEnsemble(form=form, iou_threshold=nms_iou_threshold, classes=classes,conf_threshold=0.0)
 
     elif form =='soft_nms':
-        ensemble = DualEnsemble(form = form, iou_threshold= nms_iou_threshold, conf_threshold=0.0)
+        ensemble = DualEnsemble(form = form, iou_threshold= nms_iou_threshold,classes=classes, conf_threshold=0.0)
 
     df = ensemble(df_list)
     return df
 
 
+def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Trophozoite", "WBC"]):
+    """Run ensemble pipeline with class-specific parameters."""
+    # Initialize empty result DataFrame
+    final_df = pd.DataFrame()
+    
+    # Process each class separately
+    for i, class_name in enumerate(classes):
+        class_key = class_name  # Convert to lowercase for config keys
 
+        # print(CONFIG)
+        # Get class-specific parameters
+        class_config = {
+            'form': CONFIG.get(f'{class_key}_form', 'wbf'),
+            'nms_iou_threshold': CONFIG.get(f'{class_key}_nms_iou_threshold'),
+            'wbf_iou_threshold': CONFIG.get(f'{class_key}_wbf_iou_threshold'),
+            'wbf_conf_threshold': CONFIG.get(f'{class_key}_wbf_conf_threshold'),
+            'wbf_reduction': CONFIG.get(f'{class_key}_wbf_reduction')
+        }
+        # print(df_list[0].head())
+        # Filter DataFrames for current class
+        class_dfs = [df[df['class'] == class_name].copy() for df in df_list]
+        # print(class_config)
+        # Create class-specific ensemble
+        if class_config['form'] == 'wbf':
+            ensemble = DualEnsemble(
+                form='wbf',
+                iou_threshold=class_config['wbf_iou_threshold'],
+                classes=[class_name],
+                conf_threshold=class_config['wbf_conf_threshold'],
+                weights=weight_list[i],
+                wbf_reduction=class_config['wbf_reduction']
+            )
+        elif class_config['form'] == 'nms':
+            ensemble = DualEnsemble(
+                form='nms',
+                iou_threshold=class_config['nms_iou_threshold'],
+                classes=[class_name],
+                conf_threshold=0.0
+            )
+        elif class_config['form'] == 'soft_nms':
+            ensemble = DualEnsemble(
+                form='soft_nms',
+                iou_threshold=class_config['nms_iou_threshold'],
+                classes=[class_name],
+                conf_threshold=0.0
+            )
+            
+        # Process class predictions
+        class_result = ensemble(class_dfs)
+        
+        # Combine results
+        final_df = pd.concat([final_df, class_result], ignore_index=True)
+    
+    return final_df
 
 
 if __name__ == "__main__":
