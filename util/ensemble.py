@@ -42,11 +42,11 @@ def _find_iou(box1: Box, box2: Box) -> float:
 
 
 class DualEnsemble:
-    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, conf_threshold2 = None, **kwargs):
+    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, classes: list[str], conf_threshold2 = None, **kwargs):
         assert conf_threshold2 is None or conf_threshold2 >= conf_threshold, "conf_threshold2 must be greater than conf_threshold"
         if conf_threshold2 is None:
             conf_threshold2 = conf_threshold
-        self.ensembles = [Ensemble(form, iou_threshold, conf_threshold, threshold_type='lower', **kwargs), Ensemble(form, iou_threshold, conf_threshold2, threshold_type='upper', **kwargs)]
+        self.ensembles = [Ensemble(form, iou_threshold, conf_threshold, classes=classes, threshold_type='lower', **kwargs), Ensemble(form, iou_threshold, conf_threshold2, classes=classes, threshold_type='upper', **kwargs)]
 
     def __call__(self, preds: list[pd.DataFrame]) -> pd.DataFrame:
         lower_preds = self.ensembles[0](preds)
@@ -56,11 +56,11 @@ class DualEnsemble:
 
 
 class Ensemble:
-    classes = ['WBC', 'Trophozoite']
-    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, threshold_type: str, **kwargs):
+    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, classes: list[str], threshold_type: str, **kwargs):
         self.form = form
         self.iou_threshold = iou_threshold
         self.conf_threshold = conf_threshold
+        self.classes = classes
         self.threshold_type = threshold_type
         self.params = kwargs
         self.n_models = None
@@ -93,6 +93,8 @@ class Ensemble:
                     continue
                 elif self.threshold_type == 'upper' and box.confidence > self.conf_threshold:
                     continue
+                elif box.confidence < .05:
+                    continue
                 boxes.append(Box(box.xmin, box.ymin, box.xmax, box.ymax, box.confidence, box['class'], model_index))
             image_predictions[img_id] = ImagePrediction(boxes)
         return image_predictions
@@ -100,7 +102,7 @@ class Ensemble:
     def _find_groups_in_image(self, image_predictions: list[ImagePrediction]) -> list[Group]:
         groups = []
         for class_name in self.classes:
-            all_boxes = [box for pred in image_predictions for box in pred.boxes if box.class_name == class_name]
+            all_boxes = [box for pred in image_predictions if pred is not None for box in pred.boxes if box.class_name == class_name]
             all_boxes = sorted(all_boxes, key=lambda box: box.x1)
             while len(all_boxes) > 0:
                 box_indices = {0}
@@ -119,12 +121,14 @@ class Ensemble:
                 all_boxes = [box for i, box in enumerate(all_boxes) if i not in box_indices]
         return groups
 
-
     def _find_groups(self, preds: list[dict[str, ImagePrediction]]) -> dict[str, list[Group]]:
-        image_ids = list(preds[0].keys())
+        # Modified to handle missing predictions for certain images
+        image_ids = set().union(*(pred.keys() for pred in preds))  # Get all unique image IDs across predictions
         groups = {img_id: [] for img_id in image_ids}
         for img_id in image_ids:
-            groups[img_id] = self._find_groups_in_image([pred[img_id] for pred in preds])
+            valid_predictions = [pred[img_id] for pred in preds if img_id in pred]  # Only use predictions that contain the current img_id
+            if valid_predictions:
+                groups[img_id] = self._find_groups_in_image(valid_predictions)
         return groups
     
     def _reduce_group(self, group: Group) -> Group:
@@ -143,7 +147,6 @@ class Ensemble:
         return max(group, key=lambda box: box.confidence)
     
     def _soft_nms(self, group: Group) -> Group:
-        # I don't expect much from this, it doesn't seem like an ensembling technique, or something that applies to our case
         base_box = self._nms(group)
         for box in group:
             if box == base_box:
@@ -153,7 +156,7 @@ class Ensemble:
         return group
     
     def _voting(self, group: Group) -> Group:
-        if sum(len(set([box.model_index for box in group]))) > .5 * self.n_models:
+        if len(set([box.model_index for box in group])) > 0.5 * self.n_models:
             return [self._nms(group)]
         else:
             return []
@@ -204,9 +207,7 @@ class Ensemble:
         )
         
         return fused_box
-        
-            
-
+    
 if __name__ == "__main__":
     # ensemble = Ensemble(form="nms", iou_threshold=0.5)
     ensemble = Ensemble(form="wbf", iou_threshold=0.5, conf_threshold=0.1, weights=[1, 1], wbf_reduction='mean')
