@@ -12,7 +12,7 @@ import os
 from util.wbf import weighted_boxes_fusion_df
 from util.nms import apply_class_specific_nms
 from util.wbf import apply_wbf_to_df
-from util.ensemble import Ensemble
+from util.ensemble import DualEnsemble
 #global cache variable
 cached_kde_wbc = None
 cached_kde_troph = None
@@ -301,6 +301,7 @@ def spatial_density_contour_wbc(
 
 
 def postprocessing_pipeline(CONFIG, df=None):
+    """Run postprocessing pipeline with the given configuration. If a dataframe is provided, it will be used as input. Otherwise, the input CSV file will be read."""
     # Unpack flags
     use_size_adjustment = CONFIG.get('use_size_adjustment', False)
     use_remove_edges = CONFIG.get('use_remove_edges', False)
@@ -308,37 +309,37 @@ def postprocessing_pipeline(CONFIG, df=None):
     use_spatial_density_wbc = CONFIG.get('use_spatial_density_wbc', False)
 
     # Unpack parameters
-    size_factor_troph = CONFIG.get('size_factor_troph', 1.0)
-    size_factor_wbc = CONFIG.get('size_factor_wbc', 1.0)
+    size_factor_troph = CONFIG.get('size_factor_troph')
+    size_factor_wbc = CONFIG.get('size_factor_wbc')
     
-    edge_threshold = CONFIG.get('edge_threshold', 0.1)
-    border_threshold = CONFIG.get('border_threshold', 20)
-    option_troph = CONFIG.get('option_troph', 0)
-    option_wbc = CONFIG.get('option_wbc', 0)
+    edge_threshold = CONFIG.get('edge_threshold')
+    border_threshold = CONFIG.get('border_threshold')
+    option_troph = CONFIG.get('option_troph')
+    option_wbc = CONFIG.get('option_wbc')
     
     # Parameters for spatial_density_contour_troph
-    base_adjustment_troph = CONFIG.get('base_adjustment_troph', 0.95)
-    density_multiplier_troph = CONFIG.get('density_multiplier_troph', 0.1)
-    percentile_low_troph = CONFIG.get('percentile_low_troph', 25)
-    percentile_high_troph = CONFIG.get('percentile_high_troph', 75)
-    low_density_adjustment_troph = CONFIG.get('low_density_adjustment_troph', 0.98)
-    high_density_adjustment_troph = CONFIG.get('high_density_adjustment_troph', 1.02)
-    log_scale_factor_troph = CONFIG.get('log_scale_factor_troph', 0.04)
-    expit_scale_troph = CONFIG.get('expit_scale_troph', 3)
-    adjustment_range_low_troph = CONFIG.get('adjustment_range_low_troph', 0.98)
-    adjustment_range_high_troph = CONFIG.get('adjustment_range_high_troph', 1.02)
+    base_adjustment_troph = CONFIG.get('base_adjustment_troph')
+    density_multiplier_troph = CONFIG.get('density_multiplier_troph')
+    percentile_low_troph = CONFIG.get('percentile_low_troph')
+    percentile_high_troph = CONFIG.get('percentile_high_troph')
+    low_density_adjustment_troph = CONFIG.get('low_density_adjustment_troph')
+    high_density_adjustment_troph = CONFIG.get('high_density_adjustment_troph')
+    log_scale_factor_troph = CONFIG.get('log_scale_factor_troph')
+    expit_scale_troph = CONFIG.get('expit_scale_troph')
+    adjustment_range_low_troph = CONFIG.get('adjustment_range_low_troph')
+    adjustment_range_high_troph = CONFIG.get('adjustment_range_high_troph')
 
     # Parameters for spatial_density_contour_wbc
-    base_adjustment_wbc = CONFIG.get('base_adjustment_wbc', 0.95)
-    density_multiplier_wbc = CONFIG.get('density_multiplier_wbc', 0.1)
-    percentile_low_wbc = CONFIG.get('percentile_low_wbc', 25)
-    percentile_high_wbc = CONFIG.get('percentile_high_wbc', 75)
-    low_density_adjustment_wbc = CONFIG.get('low_density_adjustment_wbc', 0.98)
-    high_density_adjustment_wbc = CONFIG.get('high_density_adjustment_wbc', 1.02)
-    log_scale_factor_wbc = CONFIG.get('log_scale_factor_wbc', 0.04)
-    expit_scale_wbc = CONFIG.get('expit_scale_wbc', 3)
-    adjustment_range_low_wbc = CONFIG.get('adjustment_range_low_wbc', 0.98)
-    adjustment_range_high_wbc = CONFIG.get('adjustment_range_high_wbc', 1.02)
+    base_adjustment_wbc = CONFIG.get('base_adjustment_wbc')
+    density_multiplier_wbc = CONFIG.get('density_multiplier_wbc')
+    percentile_low_wbc = CONFIG.get('percentile_low_wbc')
+    percentile_high_wbc = CONFIG.get('percentile_high_wbc')
+    low_density_adjustment_wbc = CONFIG.get('low_density_adjustment_wbc')
+    high_density_adjustment_wbc = CONFIG.get('high_density_adjustment_wbc')
+    log_scale_factor_wbc = CONFIG.get('log_scale_factor_wbc')
+    expit_scale_wbc = CONFIG.get('expit_scale_wbc')
+    adjustment_range_low_wbc = CONFIG.get('adjustment_range_low_wbc')
+    adjustment_range_high_wbc = CONFIG.get('adjustment_range_high_wbc')
 
     # Read initial data
     if df is None:
@@ -396,20 +397,22 @@ def postprocessing_pipeline(CONFIG, df=None):
     return df
 
 
-def ensemble_pipeline(CONFIG, df_list, weight_list):
+
+def ensemble_pipeline(CONFIG, df_list, weight_list):#create flag for dual ensemble 
     """Run ensemble pipeline on a list of dataframes. Using nms,wbf or soft-nms. specify conf and iou thresholds+wbf_reduction"""
     form = CONFIG.get('form', 'wbf')
-    nms_iou_threshold = CONFIG.get('nms_iou_threshold', 0.6)
-    wbf_iou_threshold = CONFIG.get('wbf_iou_threshold', 0.6)
-    conf_threshold = CONFIG.get('wbf_conf_threshold', 0.01)
-    wbf_reduction = CONFIG.get('wbf_reduction', 'mean')
+    nms_iou_threshold = CONFIG.get('nms_iou_threshold')
+    wbf_iou_threshold = CONFIG.get('wbf_iou_threshold')
+    wbf_conf_threshold = CONFIG.get('wbf_conf_threshold')
+    wbf_reduction = CONFIG.get('wbf_reduction')
+    # print(form, nms_iou_threshold, wbf_iou_threshold, wbf_conf_threshold, wbf_reduction)
     if form =='wbf':
-        ensemble = Ensemble(form, wbf_iou_threshold, conf_threshold, weights=weight_list, wbf_reduction=wbf_reduction)
+        ensemble = DualEnsemble(form=form, iou_threshold=wbf_iou_threshold, conf_threshold=wbf_conf_threshold, weights=weight_list, wbf_reduction=wbf_reduction)
     elif form == 'nms':
-        ensemble = Ensemble(form, nms_iou_threshold)
+        ensemble = DualEnsemble(form=form, iou_threshold=nms_iou_threshold, conf_threshold=0.0)
 
     elif form =='soft_nms':
-        ensemble = Ensemble(form, nms_iou_threshold)
+        ensemble = DualEnsemble(form = form, iou_threshold= nms_iou_threshold, conf_threshold=0.0)
 
     df = ensemble(df_list)
     return df
@@ -439,28 +442,3 @@ if __name__ == "__main__":
 
     df_processed.to_csv(CONFIG['OUTPUT_CSV'], index=False)
 
-
-
-# import cProfile
-#     import pstats
-#     import io
-
-#     def profile_postprocessing(CONFIG):
-#         pr = cProfile.Profile()
-#         pr.enable()
-        
-#         # Run the postprocessing pipeline function
-#         postprocessing_pipeline(CONFIG)
-        
-#         pr.disable()
-#         s = io.StringIO()
-#         sortby = 'cumulative'
-#         ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-#         ps.print_stats()
-        
-#         # Display profiling results
-#         print(s.getvalue())
-
-
-#     # Run profiling
-#     profile_postprocessing(CONFIG)

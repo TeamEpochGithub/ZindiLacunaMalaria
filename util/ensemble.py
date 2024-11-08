@@ -41,15 +41,32 @@ def _find_iou(box1: Box, box2: Box) -> float:
     return intersection / float(union)
 
 
+class DualEnsemble:
+    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, conf_threshold2 = None, **kwargs):
+        assert conf_threshold2 is None or conf_threshold2 >= conf_threshold, "conf_threshold2 must be greater than conf_threshold"
+        if conf_threshold2 is None:
+            conf_threshold2 = conf_threshold
+        self.ensembles = [Ensemble(form, iou_threshold, conf_threshold, threshold_type='lower', **kwargs), Ensemble(form, iou_threshold, conf_threshold2, threshold_type='upper', **kwargs)]
+
+    def __call__(self, preds: list[pd.DataFrame]) -> pd.DataFrame:
+        lower_preds = self.ensembles[0](preds)
+        upper_preds = self.ensembles[1](preds)
+        preds = pd.concat([lower_preds, upper_preds])
+        return preds
+
+
 class Ensemble:
     classes = ['WBC', 'Trophozoite']
-    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, **kwargs):
+    def __init__(self, form: str, iou_threshold: float, conf_threshold: float, threshold_type: str, **kwargs):
         self.form = form
         self.iou_threshold = iou_threshold
         self.conf_threshold = conf_threshold
+        self.threshold_type = threshold_type
         self.params = kwargs
+        self.n_models = None
 
     def __call__(self, preds: list[pd.DataFrame]) -> pd.DataFrame:
+        self.n_models = len(preds)
         image_predictions = [self._to_image_predictions(pred, i) for i, pred in enumerate(preds)]
         groups = self._find_groups(image_predictions)
         for img_id in groups:
@@ -59,9 +76,9 @@ class Ensemble:
             groups[img_id] = post_reduce_boxes
         return self._to_df(groups)
     
-    def _to_df(self, reduced_groups: dict[str, list[Box]]) -> pd.DataFrame:
+    def _to_df(self, post_reduce_boxes: dict[str, list[Box]]) -> pd.DataFrame:
         rows = []
-        for img_id, boxes in reduced_groups.items():
+        for img_id, boxes in post_reduce_boxes.items():
             for box in boxes:
                 rows.append({'Image_ID': img_id, 'xmin': box.x1, 'ymin': box.y1, 'xmax': box.x2, 'ymax': box.y2, 'confidence': box.confidence, 'class': box.class_name})
         return pd.DataFrame(rows)
@@ -72,7 +89,9 @@ class Ensemble:
             boxes_df = pred[pred['Image_ID'] == img_id]
             boxes = []
             for _, box in boxes_df.iterrows():
-                if box.confidence < self.conf_threshold:
+                if self.threshold_type == 'lower' and box.confidence < self.conf_threshold:
+                    continue
+                elif self.threshold_type == 'upper' and box.confidence > self.conf_threshold:
                     continue
                 boxes.append(Box(box.xmin, box.ymin, box.xmax, box.ymax, box.confidence, box['class'], model_index))
             image_predictions[img_id] = ImagePrediction(boxes)
@@ -115,6 +134,8 @@ class Ensemble:
             return [self._weighted_boxes_fusion(group)]
         elif self.form == "soft_nms":
             return self._soft_nms(group)
+        elif self.form == "voting":
+            return self._voting(group)
         else:
             raise ValueError(f"Unknown form: {self.form}")
     
@@ -130,6 +151,12 @@ class Ensemble:
             iou = _find_iou(box, base_box)
             box.confidence *= 1 - iou
         return group
+    
+    def _voting(self, group: Group) -> Group:
+        if sum(len(set([box.model_index for box in group]))) > .5 * self.n_models:
+            return [self._nms(group)]
+        else:
+            return []
     
     def _weighted_boxes_fusion(self, group: Group) -> Box:
         x1 = np.array([box.x1 for box in group])
