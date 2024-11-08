@@ -41,9 +41,9 @@ for i in range(1, 6):
 
     final_preds: dict[str, list[pd.DataFrame]] = {}
 
-    for model in yolo_model_fold:
+    for j, model in enumerate(yolo_model_fold):
         yolo_preds = yolo_predict_tta(model, img_paths=val_images_paths)
-        final_preds[f'yolo_{model.model_name}'] = yolo_preds
+        final_preds[f'yolo_{model.model_name}{i}{j}'] = yolo_preds
 
     for file in detr_csvs:
         # detr_preds = detr_tta_inference(model, image_paths=test_images_paths, tta_transforms=['flip'])
@@ -51,11 +51,15 @@ for i in range(1, 6):
         final_preds['detr'] = detr_preds
 
     # Save the final predictions to disk
+
     os.makedirs('data/predictions', exist_ok=True)
     for model_name, preds in final_preds.items():
-        for i, df in enumerate(preds):
-            os.makedirs(f'data/predictions/SPLIT{i}{model_name[:3]}', exist_ok=True)
-            df.to_csv(f'data/predictions/SPLIT{i}{model_name[:3]}/predictions_{i+1}.csv', index=False)
+        print(f"Saving predictions for {model_name}")
+        print(len(preds))
+        print(preds)
+        for k, df in enumerate(preds):
+            os.makedirs(f'data/predictions/SPLIT{k}/{model_name}', exist_ok=True)
+            df.to_csv(f'data/predictions/SPLIT{k}/{model_name}/predictions_{i}.csv', index=False)
 
 
 
