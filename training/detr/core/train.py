@@ -53,9 +53,13 @@ def train(config, model, processor, data_dir, device):
         scheduler (torch.optim.lr_scheduler._LRScheduler): The learning rate scheduler.
     """
     model.to(device)
-    optimizer, scheduler, ema = initialize_optimizer(model, config)
 
     train_dataloader = get_train_dataloader(config, data_dir, processor)
+
+    n_steps = len(train_dataloader) // config['training']['n_accum']
+    n_steps *= config['training']['num_epochs']
+    
+    optimizer, scheduler, ema = initialize_optimizer(model, config, n_steps)
 
 
     for epoch in range(config['training']['num_epochs']):

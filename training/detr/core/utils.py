@@ -118,7 +118,7 @@ def get_device():
     print('device', device)
     return device
 
-def initialize_optimizer(model, config) -> Tuple[torch.nn.Module, torch.optim.Optimizer, torch.optim.lr_scheduler._LRScheduler]:
+def initialize_optimizer(model, config, n_steps) -> Tuple[torch.nn.Module, torch.optim.Optimizer, torch.optim.lr_scheduler._LRScheduler]:
     # Create optimizer
     optimizer = SOAP(model.parameters(), lr=config['training']['learning_rate'])
 
@@ -126,7 +126,7 @@ def initialize_optimizer(model, config) -> Tuple[torch.nn.Module, torch.optim.Op
     warmup_scheduler = LinearLR(optimizer, start_factor=0.001, end_factor=1.0, total_iters=config['training']['warmup_steps'])
     
     # Create cosine annealing scheduler
-    cosine_scheduler = CosineAnnealingLR(optimizer, T_max=config['training']['num_epochs'] - config['training']['warmup_steps'])
+    cosine_scheduler = CosineAnnealingLR(optimizer, T_max=n_steps - config['training']['warmup_steps'])
     
     # Combine warmup and cosine schedulers
     scheduler = SequentialLR(optimizer, schedulers=[warmup_scheduler, cosine_scheduler], milestones=[config['training']['warmup_steps']])
