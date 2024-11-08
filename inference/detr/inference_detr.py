@@ -4,7 +4,7 @@ import cv2
 import pandas as pd
 from tqdm import tqdm
 
-from inference.tta import model_tta_preprocessing
+from inference.tta import get_img_tta_augs
 from inference.yolo.inference_yolo_models import yolo_predict
 
 
@@ -51,7 +51,7 @@ def detr_tta_inference(model, image_paths: List[str], tta_transforms: List[str] 
     # Load images from file paths
     images = [cv2.imread(path) for path in image_paths]
 
-    tta_images = model_tta_preprocessing(images, tta_transforms)
+    tta_images = get_img_tta_augs(images, tta_transforms)
 
     results = []
     for aug, aug_images in tta_images.items():
