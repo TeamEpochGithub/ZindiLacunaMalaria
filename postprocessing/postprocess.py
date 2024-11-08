@@ -424,7 +424,7 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
     final_df = pd.DataFrame()
     
     # Process each class separately
-    for i, class_name in enumerate(classes):
+    for j, class_name in enumerate(classes):
         class_key = class_name  # Convert to lowercase for config keys
 
         # print(CONFIG)
@@ -447,7 +447,7 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
                 iou_threshold=class_config['wbf_iou_threshold'],
                 classes=[class_name],
                 conf_threshold=class_config['wbf_conf_threshold'],
-                weights=weight_list[i],
+                weights=weight_list[j],
                 wbf_reduction=class_config['wbf_reduction']
             )
         elif class_config['form'] == 'nms':
