@@ -98,6 +98,90 @@ parameters:
   output_path:
     value: "submissions/ensemble_results.csv"
 
+  # ============================
+  # DETR Processing Parameters - Trophozoite
+  # ============================
+  postprocessing_individual_detr_Trophozoite_use_size_adjustment:
+    distribution: categorical
+    values: [true, false]
+
+  postprocessing_individual_detr_Trophozoite_use_remove_edges:
+    distribution: categorical
+    values: [true, false]
+
+  postprocessing_individual_detr_WBC_use_aspect_ratio_filter:
+    distribution: categorical
+    values: [true, false]
+
+  postprocessing_individual_detr_Trophozoite_size_factor:
+    distribution: uniform
+    min: 0.85
+    max: 1.1
+
+  postprocessing_individual_detr_Trophozoite_edge_threshold:
+    distribution: uniform
+    min: 0.05
+    max: 0.15
+
+  postprocessing_individual_detr_Trophozoite_border_threshold:
+    distribution: uniform
+    min: 0.8
+    max: 1.2
+
+  postprocessing_individual_detr_Trophozoite_upper_aspect_ratio_threshold:
+    distribution: uniform
+    min: 2.0
+    max: 2.5
+  postprocessing_individual_detr_Trophozoite_lower_aspect_ratio_threshold:
+    distribution: uniform
+    min: 0.3
+    max: 0.6
+
+
+  
+
+  # ============================
+  # DETR Processing Parameters - WBC
+  # ============================
+  postprocessing_individual_detr_WBC_use_size_adjustment:
+    distribution: categorical
+    values: [true, false]
+
+  postprocessing_individual_detr_WBC_use_remove_edges:
+    distribution: categorical
+    values: [true, false]
+  
+  postprocessing_individual_detr_WBC_use_aspect_ratio_filter:
+    distribution: categorical
+    values: [true, false]
+
+  postprocessing_individual_detr_WBC_size_factor:
+    distribution: uniform
+    min: 0.85
+    max: 1.1
+
+  postprocessing_individual_detr_WBC_edge_threshold:
+    distribution: uniform
+    min: 0.05
+    max: 0.15
+
+  postprocessing_individual_detr_WBC_border_threshold:
+    distribution: uniform
+    min: 0.8
+    max: 1.2
+
+  postprocessing_individual_detr_WBC_upper_aspect_ratio_threshold:
+    distribution: uniform
+    min: 2.0
+    max: 2.5
+  postprocessing_individual_detr_WBC_lower_aspect_ratio_threshold:
+    distribution: uniform
+    min: 0.3
+    max: 0.6
+
+  
+
+
 
   # ============================
   # YOLO 11 Processing Parameters - Trophozoite
@@ -113,7 +197,7 @@ parameters:
   postprocessing_individual_yolo11_Trophozoite_size_factor:
     distribution: uniform
     min: 0.85
-    max: 1.0
+    max: 1.05
 
   postprocessing_individual_yolo11_Trophozoite_edge_threshold:
     distribution: uniform
@@ -139,7 +223,7 @@ parameters:
   postprocessing_individual_yolo11_WBC_size_factor:
     distribution: uniform
     min: 0.85
-    max: 1.0
+    max: 1.05
 
   postprocessing_individual_yolo11_WBC_edge_threshold:
     distribution: uniform
@@ -165,7 +249,7 @@ parameters:
   postprocessing_individual_yolo9_Trophozoite_size_factor:
     distribution: uniform
     min: 0.85
-    max: 1.0
+    max: 1.05
 
   postprocessing_individual_yolo9_Trophozoite_edge_threshold:
     distribution: uniform
@@ -191,7 +275,7 @@ parameters:
   postprocessing_individual_yolo9_WBC_size_factor:
     distribution: uniform
     min: 0.85
-    max: 1.0
+    max: 1.05
 
   postprocessing_individual_yolo9_WBC_edge_threshold:
     distribution: uniform
@@ -226,8 +310,8 @@ parameters:
 
   postprocessing_ensemble_yolo_Trophozoite_wbf_conf_threshold:
     distribution: uniform
-    min: 0.5
-    max: 0.85
+    min: 0.01
+    max: 0.4
 
   # ============================
   # Ensemble YOLO Parameters - WBC
@@ -252,8 +336,8 @@ parameters:
 
   postprocessing_ensemble_yolo_WBC_wbf_conf_threshold:
     distribution: uniform
-    min: 0.5
-    max: 0.85
+    min: 0.01
+    max: 0.3
 
   # ============================
   # Final Ensemble Parameters - Trophozoite
@@ -278,8 +362,8 @@ parameters:
 
   postprocessing_ensemble_all_Trophozoite_wbf_conf_threshold:
     distribution: uniform
-    min: 0.1
-    max: 0.5
+    min: 0.01
+    max: 0.3
 
   postprocessing_ensemble_all_Trophozoite_use_size_filtering:
     distribution: categorical
@@ -365,8 +449,8 @@ parameters:
 
   postprocessing_ensemble_all_WBC_wbf_conf_threshold:
     distribution: uniform
-    min: 0.1
-    max: 0.5
+    min: 0.01
+    max: 0.3
 
   postprocessing_ensemble_all_WBC_use_size_filtering:
     distribution: categorical
