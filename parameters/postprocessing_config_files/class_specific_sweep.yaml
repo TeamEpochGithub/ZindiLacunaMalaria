@@ -1,6 +1,6 @@
 
 # Program and Method Configuration
-program: cv_sweep/postprocess.py
+program: cv_sweep/sweep_postprocess.py
 method: bayes
 
 # Metric Configuration
@@ -36,27 +36,27 @@ parameters:
     min: 0.9
     max: 1.0
 
-  # YOLO9 weights for Trophozoite and WBC
-  yolo9_weight_Trophozoite:
-    distribution: uniform
-    min: 0.0
-    max: 0.5
+  # # YOLO9 weights for Trophozoite and WBC
+  # yolo9_weight_Trophozoite:
+  #   distribution: uniform
+  #   min: 0.0
+  #   max: 0.5
 
-  yolo9_weight_WBC:
-    distribution: uniform
-    min: 0.0
-    max: 0.5
+  # yolo9_weight_WBC:
+  #   distribution: uniform
+  #   min: 0.0
+  #   max: 0.5
 
-  # YOLO11 weights for Trophozoite and WBC
-  yolo11_weight_Trophozoite:
-    distribution: uniform
-    min: 0.9
-    max: 1.0
+  # # YOLO11 weights for Trophozoite and WBC
+  # yolo11_weight_Trophozoite:
+  #   distribution: uniform
+  #   min: 0.9
+  #   max: 1.0
 
-  yolo11_weight_WBC:
-    distribution: uniform
-    min: 0.9
-    max: 1.0
+  # yolo11_weight_WBC:
+  #   distribution: uniform
+  #   min: 0.9
+  #   max: 1.0
 
   # ============================
   # Input Configurations (Fixed Values)
@@ -208,8 +208,6 @@ parameters:
     distribution: uniform
     min: 0.01
     max: 0.3
-
-
 
 
   # ============================

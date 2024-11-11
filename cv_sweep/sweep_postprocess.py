@@ -8,10 +8,10 @@ import yaml
 from scipy.stats import describe
 from tqdm import tqdm
 
-from postprocessing.ensemble import DualEnsemble
+
 from util.save import save_with_negs
 from util.mAP_zindi import mAP_zindi_calculation
-from postprocessing.postprocess import postprocessing_pipeline, ensemble_class_specific_pipeline
+from postprocessing.postprocess_functions import postprocessing_pipeline, ensemble_class_specific_pipeline
 import concurrent.futures
 import logging
 
@@ -80,7 +80,7 @@ def create_structured_config(wandb_config):
                         config['postprocessing'][section][param] = value
         
         # Handle ensemble weights
-        elif any(key.startswith(prefix) for prefix in ['detr_weight_', 'yolo_weight_', 'yolo11_weight_', 'yolo9_weight_']):
+        elif any(key.startswith(prefix) for prefix in ['detr_weight_', 'yolo_weight_']):
             weight_parts = key.split('_')
             model = weight_parts[0]
             class_type = weight_parts[-1]
@@ -229,15 +229,6 @@ def run_fold(config, fold_num, yolo11_cv_files_split, detr_cv_files):
     # Early stopping check on fold 1
     if fold_num == 1 and map_score < 0.86:
         print(f"Early stopping: Fold 1 mAP ({map_score:.4f}) below threshold")
-        wandb.log({
-            "mAP": map_score,
-            "AP_troph": ap_dict['Trophozoite'],
-            "AP_WBC": ap_dict['WBC'],
-            "lamr_troph": lamr_dict['Trophozoite'],
-            "lamr_WBC": lamr_dict['WBC'],
-            "early_stopped": True,
-            "completed_folds": 1
-        })
         return None # Exit this trial and move to next wandb suggestion
     
     return {
@@ -287,7 +278,7 @@ def run_experiment(config_file):
                             "data/predictions/SPLIT5/detr/fold5_tta2.csv",
                             "data/predictions/SPLIT5/detr/fold5_tta3.csv",
                             "data/predictions/SPLIT5/detr/fold5_tta4.csv",]
-                          ]   #TODO: fix this and infer
+                          ]   
         yolo11_cv_files = [
         [
             "data/predictions/SPLIT1/yolo_models/predictions_0.csv",
@@ -320,10 +311,7 @@ def run_experiment(config_file):
             "data/predictions/SPLIT5/yolo_models/predictions_3.csv"
         ]
     ]
-        # # Run cross-validation folds in parallel
-        # with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        #     futures = [executor.submit(run_fold, config, i, yolo11_cv_files[i-1], detr_cv_files) for i in range(1, 6)]
-        #     results = [future.result() for future in concurrent.futures.as_completed(futures)]
+        
         results = []
         for i in range(1, 6):
             result = run_fold(config, i, yolo11_cv_files[i-1], detr_cv_files[i-1])
@@ -365,13 +353,6 @@ def run_experiment(config_file):
             with open(best_config_path, 'w') as f:
                 yaml.dump(config, f)
             logging.info(f"Best configuration saved to {best_config_path}")
-
-
-# def run_multiple_experiments(config_files):
-#     # Run multiple experiments in parallel
-#     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-#         futures = [executor.submit(run_experiment, config_file) for config_file in config_files]
-#         concurrent.futures.wait(futures)
 
 
 if __name__ == "__main__":
