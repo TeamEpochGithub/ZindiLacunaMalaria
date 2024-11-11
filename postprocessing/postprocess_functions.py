@@ -9,9 +9,6 @@ from functools import partial
 from scipy.stats import gaussian_kde
 import os
 
-from util.wbf import weighted_boxes_fusion_df
-from util.nms import apply_class_specific_nms
-from util.wbf import apply_wbf_to_df
 from util.ensemble import DualEnsemble
 #global cache variable
 cached_kde_wbc = None
@@ -119,7 +116,7 @@ def factor_bbox_size_change(df, factor_wbc, factor_troph):
     df = pd.concat([df_wbc, df_troph, df_neg], ignore_index=True)
     return df
 
-def remove_bbox_near_edges(df, data_dir, edge_threshold=0.1, border_threshold=20):
+def remove_bbox_near_edges(df, data_dir, edge_threshold, border_threshold):
     df = df.copy()
     def detect_black_borders(img_path):
         img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
@@ -206,12 +203,12 @@ def basic_postprocess(df, data_dir, neg_csv, test_csv):
     return filtered_dfs
 
 def spatial_density_contour_troph(
-    df, df_train, CONFIG, option=0,
-    base_adjustment=0.95, density_multiplier=0.1,
-    percentile_low=25, percentile_high=75,
-    low_density_adjustment=0.98, high_density_adjustment=1.02,
-    log_scale_factor=0.04, expit_scale=3,
-    adjustment_range_low=0.98, adjustment_range_high=1.02
+    df, df_train, CONFIG, option,
+    base_adjustment, density_multiplier,
+    percentile_low, percentile_high,
+    low_density_adjustment, high_density_adjustment,
+    log_scale_factor, expit_scale,
+    adjustment_range_low, adjustment_range_high
 ):
   
     if "SPLIT_CSV" in CONFIG:
@@ -269,12 +266,12 @@ def initialize_troph_kde(df_train):
 
 
 def spatial_density_contour_wbc(
-    df, df_train, CONFIG, option=0,
-    base_adjustment=0.95, density_multiplier=0.1,
-    percentile_low=25, percentile_high=75,
-    low_density_adjustment=0.98, high_density_adjustment=1.02,
-    log_scale_factor=0.04, expit_scale=3,
-    adjustment_range_low=0.98, adjustment_range_high=1.02
+    df, df_train, CONFIG, option,
+    base_adjustment, density_multiplier,
+    percentile_low, percentile_high,
+    low_density_adjustment, high_density_adjustment,
+    log_scale_factor, expit_scale,
+    adjustment_range_low, adjustment_range_high
 ):
     if "SPLIT_CSV" in CONFIG:
         split_df = pd.read_csv(CONFIG["SPLIT_CSV"])
@@ -421,14 +418,14 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
                 form='nms',
                 iou_threshold=class_config['nms_iou_threshold'],
                 classes=[class_name],
-                conf_threshold=0.01
+                conf_threshold=0.0 
             )
         elif class_config['form'] == 'soft_nms':
             ensemble = DualEnsemble(
                 form='soft_nms',
                 iou_threshold=class_config['nms_iou_threshold'],
                 classes=[class_name],
-                conf_threshold=0.01
+                conf_threshold=0.0 
             )
             
         # Process class predictions
