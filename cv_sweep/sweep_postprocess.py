@@ -137,107 +137,117 @@ def run_fold(config, fold_num, yolo11_cv_files_split, detr_cv_files):
 
         return pipeline_config
 
-    try:
-        # Process YOLO predictions
-        yolo_dfs = []
-         # Process YOLO11
-        logging.info(f"Processing YOLO11 predictions for fold {fold_num}. Will run TTA ensemble.")
-        for tta_flip in range(len(yolo11_cv_files_split)):
-            yolo_df = pd.read_csv(yolo11_cv_files_split[tta_flip])
-            yolo_dfs.append(yolo_df)
-        yolo_tta_config = create_pipeline_config(
-            config['postprocessing']['ensemble_ttayolo'],
-            config['input']
-        )
-       
-        yolo_tta_df = ensemble_class_specific_pipeline(CONFIG=yolo_tta_config, df_list=yolo_dfs, weight_list=[[1, 1, 1, 1],[1, 1, 1, 1]])#weight list expects 4 weights for troph and wbc
-        logging.info(f"Completed YOLO11 ensembling of TTA predictions for fold {fold_num}")
-        yolo_individual_config = create_pipeline_config(
-            config['postprocessing']['individual_yolo11'],
-            config['input']
-        )
-        yolo_tta_df = postprocessing_pipeline(yolo_individual_config, yolo_tta_df)
-        logging.info(f"Completed YOLO11 postprocessing for fold {fold_num}")
+   
+    # Process YOLO predictions
+    yolo_dfs = []
+        # Process YOLO11
+    logging.info(f"Processing YOLO11 predictions for fold {fold_num}. Will run TTA ensemble.")
+    for tta_flip in range(len(yolo11_cv_files_split)):
+        yolo_df = pd.read_csv(yolo11_cv_files_split[tta_flip])
+        yolo_dfs.append(yolo_df)
+    yolo_tta_config = create_pipeline_config(
+        config['postprocessing']['ensemble_ttayolo'],
+        config['input']
+    )
+    
+    yolo_tta_df = ensemble_class_specific_pipeline(CONFIG=yolo_tta_config, df_list=yolo_dfs, weight_list=[[1, 1, 1, 1],[1, 1, 1, 1]])#weight list expects 4 weights for troph and wbc
+    logging.info(f"Completed YOLO11 ensembling of TTA predictions for fold {fold_num}")
+    yolo_individual_config = create_pipeline_config(
+        config['postprocessing']['individual_yolo11'],
+        config['input']
+    )
+    yolo_tta_df = postprocessing_pipeline(yolo_individual_config, yolo_tta_df)
+    logging.info(f"Completed YOLO11 postprocessing for fold {fold_num}")
 
-            # Process DETR predictions
-        detr_file = detr_cv_files[fold_num - 1]
-        detr_df = pd.read_csv(detr_file)
-        detr_pipeline_config = create_pipeline_config(
-            config['postprocessing']['individual_detr'],
-            config['input']
-        )
-        detr_df = postprocessing_pipeline(detr_pipeline_config, detr_df)
-        # Apply DETR weight to confidence scores
+    # Process DETR predictions
+    detr_dfs = []
+    for tta_flip in range(len(detr_cv_files)):
+        detr_df = pd.read_csv(detr_cv_files[tta_flip])
+        detr_dfs.append(detr_df)
 
-        # Final ensemble
-        logging.info(f"Running final ensemble for fold {fold_num}")
-        final_pipeline_config = create_pipeline_config(
-            config['postprocessing']['ensemble_all'],
-            config['input']
-        )
-        final_weights = [[config['troph_weights']['yolo_weight'], config['troph_weights']['detr_weight']],
-                         [config['wbc_weights']['yolo_weight'], config['wbc_weights']['detr_weight']]]
-        all_df = ensemble_class_specific_pipeline(
-            CONFIG=final_pipeline_config,
-            df_list=[yolo_tta_df, detr_df],
-            weight_list=final_weights
-        )
-        # Calculate metrics
-        map_score, ap_dict, lamr_dict = score_on_validation_set(
-            df=all_df,
-            fold_num=fold_num,
-            split_csv=config['input']['SPLIT_CSV'],
-            train_csv=config['input']['TRAIN_CSV']
-        )
-        logging.info(f"Completed final ensemble for fold {fold_num}")
-        
-        
-        # Calculate and log mean metrics
-        mean_metrics = {k: np.mean(v) for k, v in cv_metrics.items()}
-        wandb.log(mean_metrics)
-        
-        # Save best configuration
-        if mean_metrics['mAP'] > wandb.run.summary.get('best_AP_mean', 0):
-            wandb.run.summary['best_AP_mean'] = mean_metrics['mAP']
-            best_config_path = os.path.join(wandb.run.dir, 'best_config.yaml')
-            with open(best_config_path, 'w') as f:
-                yaml.dump(config, f)
-        
-        # Store metrics
-        print(f"Fold {fold_num} metrics:")
-        print(f"mAP: {map_score}")
-        print(f"AP: {ap_dict}")
-        print(f"LAMR: {lamr_dict}")
-        cv_metrics["mAP"].append(map_score)
-        cv_metrics["AP_troph"].append(ap_dict['Trophozoite'])
-        cv_metrics["AP_WBC"].append(ap_dict['WBC'])
-        cv_metrics["lamr_troph"].append(lamr_dict['Trophozoite'])
-        cv_metrics["lamr_WBC"].append(lamr_dict['WBC'])
+    detr_tta_config = create_pipeline_config(
+        config['postprocessing']['ensemble_ttadetr'],
+        config['input']
+    )
+    detr_tta_df = ensemble_class_specific_pipeline(CONFIG=detr_tta_config, df_list=detr_dfs, weight_list=[[1, 1, 1, 1],[1, 1, 1, 1]])#weight list expects 4 weights for troph and wbc
+    logging.info(f"Completed DETR ensembling of TTA predictions for fold {fold_num}")
+
+    detr_pipeline_config = create_pipeline_config(
+        config['postprocessing']['individual_detr'],
+        config['input']
+    )
+    detr_df = postprocessing_pipeline(detr_pipeline_config, detr_tta_df)
+    # Apply DETR weight to confidence scores
+
+    # Final ensemble
+    logging.info(f"Running final ensemble for fold {fold_num}")
+    final_pipeline_config = create_pipeline_config(
+        config['postprocessing']['ensemble_all'],
+        config['input']
+    )
+    final_weights = [[config['troph_weights']['yolo_weight'], config['troph_weights']['detr_weight']],
+                        [config['wbc_weights']['yolo_weight'], config['wbc_weights']['detr_weight']]]
+    all_df = ensemble_class_specific_pipeline(
+        CONFIG=final_pipeline_config,
+        df_list=[yolo_tta_df, detr_df],
+        weight_list=final_weights
+    )
+    all_df = postprocessing_pipeline(final_pipeline_config, all_df)
+    # Calculate metrics
+    map_score, ap_dict, lamr_dict = score_on_validation_set(
+        df=all_df,
+        fold_num=fold_num,
+        split_csv=config['input']['SPLIT_CSV'],
+        train_csv=config['input']['TRAIN_CSV']
+    )
+    logging.info(f"Completed final ensemble for fold {fold_num}")
+    
+    
+    # Calculate and log mean metrics
+    mean_metrics = {k: np.mean(v) for k, v in cv_metrics.items()}
+    wandb.log(mean_metrics)
+    
+    # Save best configuration
+    if mean_metrics['mAP'] > wandb.run.summary.get('best_AP_mean', 0):
+        wandb.run.summary['best_AP_mean'] = mean_metrics['mAP']
+        best_config_path = os.path.join(wandb.run.dir, 'best_config.yaml')
+        with open(best_config_path, 'w') as f:
+            yaml.dump(config, f)
+    
+    # Store metrics
+    print(f"Fold {fold_num} metrics:")
+    print(f"mAP: {map_score}")
+    print(f"AP: {ap_dict}")
+    print(f"LAMR: {lamr_dict}")
+    cv_metrics["mAP"].append(map_score)
+    cv_metrics["AP_troph"].append(ap_dict['Trophozoite'])
+    cv_metrics["AP_WBC"].append(ap_dict['WBC'])
+    cv_metrics["lamr_troph"].append(lamr_dict['Trophozoite'])
+    cv_metrics["lamr_WBC"].append(lamr_dict['WBC'])
 
 
-        # Early stopping check on fold 1
-        if fold_num == 1 and map_score < 0.86:
-            print(f"Early stopping: Fold 1 mAP ({map_score:.4f}) below threshold")
-            wandb.log({
-                "mAP": map_score,
-                "AP_troph": ap_dict['Trophozoite'],
-                "AP_WBC": ap_dict['WBC'],
-                "lamr_troph": lamr_dict['Trophozoite'],
-                "lamr_WBC": lamr_dict['WBC'],
-                "early_stopped": True,
-                "completed_folds": 1
-            })
-            return None # Exit this trial and move to next wandb suggestion
-        
-        return {
+    # Early stopping check on fold 1
+    if fold_num == 1 and map_score < 0.86:
+        print(f"Early stopping: Fold 1 mAP ({map_score:.4f}) below threshold")
+        wandb.log({
             "mAP": map_score,
             "AP_troph": ap_dict['Trophozoite'],
             "AP_WBC": ap_dict['WBC'],
             "lamr_troph": lamr_dict['Trophozoite'],
-            "lamr_WBC": lamr_dict['WBC']
-        }
-    except:
-        logging.exception(f"Error running fold {fold_num}")
+            "lamr_WBC": lamr_dict['WBC'],
+            "early_stopped": True,
+            "completed_folds": 1
+        })
+        return None # Exit this trial and move to next wandb suggestion
+    
+    return {
+        "mAP": map_score,
+        "AP_troph": ap_dict['Trophozoite'],
+        "AP_WBC": ap_dict['WBC'],
+        "lamr_troph": lamr_dict['Trophozoite'],
+        "lamr_WBC": lamr_dict['WBC']
+    }
+   
 
 
 def run_experiment(config_file):
@@ -253,42 +263,61 @@ def run_experiment(config_file):
         with open(best_config_path, 'w') as f:
             yaml.dump(config, f)
         # Cross-validation files
-        detr_cv_files = ["csv_cv/detr_911/fold_1.csv",
-                         "csv_cv/detr_911/fold_2.csv",
-                         "csv_cv/detr_911/fold_3.csv",
-                         "csv_cv/detr_911/fold_4.csv",
-                         "csv_cv/detr_911/fold_5.csv"
-                         ]   #TODO: fix this and infer
+        detr_cv_files = [["data/predictions/SPLIT1/detr/fold1_tta1.csv",
+                          "data/predictions/SPLIT1/detr/fold1_tta2.csv",
+                          "data/predictions/SPLIT1/detr/fold1_tta3.csv",
+                          "data/predictions/SPLIT1/detr/fold1_tta4.csv",],
+
+                            ["data/predictions/SPLIT2/detr/fold2_tta1.csv",
+                            "data/predictions/SPLIT2/detr/fold2_tta2.csv",
+                            "data/predictions/SPLIT2/detr/fold2_tta3.csv",
+                            "data/predictions/SPLIT2/detr/fold2_tta4.csv",],
+
+                            ["data/predictions/SPLIT3/detr/fold3_tta1.csv",
+                            "data/predictions/SPLIT3/detr/fold3_tta2.csv",
+                            "data/predictions/SPLIT3/detr/fold3_tta3.csv",
+                            "data/predictions/SPLIT3/detr/fold3_tta4.csv",],
+
+                            ["data/predictions/SPLIT4/detr/fold4_tta1.csv",
+                            "data/predictions/SPLIT4/detr/fold4_tta2.csv",
+                            "data/predictions/SPLIT4/detr/fold4_tta3.csv",
+                            "data/predictions/SPLIT4/detr/fold4_tta4.csv",],
+
+                            ["data/predictions/SPLIT5/detr/fold5_tta1.csv",
+                            "data/predictions/SPLIT5/detr/fold5_tta2.csv",
+                            "data/predictions/SPLIT5/detr/fold5_tta3.csv",
+                            "data/predictions/SPLIT5/detr/fold5_tta4.csv",]
+                          ]   #TODO: fix this and infer
         yolo11_cv_files = [
         [
-            "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_0.csv",
-            "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_1.csv",
-            "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_2.csv",
-            "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_3.csv"
+            "data/predictions/SPLIT1/yolo_models/predictions_0.csv",
+            "data/predictions/SPLIT1/yolo_models/predictions_1.csv",
+            "data/predictions/SPLIT1/yolo_models/predictions_2.csv",
+            "data/predictions/SPLIT1/yolo_models/predictions_3.csv"
         ],
         [   
-            "data/predictions/SPLIT2/yolo_models/worthy_sweep3/train79/weights/best.pt20/predictions_0.csv",
-            "data/predictions/SPLIT2/yolo_models/worthy_sweep3/train79/weights/best.pt20/predictions_1.csv",
-            "data/predictions/SPLIT2/yolo_models/worthy_sweep3/train79/weights/best.pt20/predictions_2.csv",
-            "data/predictions/SPLIT2/yolo_models/worthy_sweep3/train79/weights/best.pt20/predictions_3.csv"
+            "data/predictions/SPLIT2/yolo_models/predictions_0.csv",
+            "data/predictions/SPLIT2/yolo_models/predictions_1.csv",
+            "data/predictions/SPLIT2/yolo_models/predictions_2.csv",
+            "data/predictions/SPLIT2/yolo_models/predictions_3.csv"
         ],
         [   
-            "data/predictions/SPLIT3/yolo_models/worthy_sweep3/train81/weights/best.pt30/predictions_0.csv",
-            "data/predictions/SPLIT3/yolo_models/worthy_sweep3/train81/weights/best.pt30/predictions_1.csv",
-            "data/predictions/SPLIT3/yolo_models/worthy_sweep3/train81/weights/best.pt30/predictions_2.csv",
-            "data/predictions/SPLIT3/yolo_models/worthy_sweep3/train81/weights/best.pt30/predictions_3.csv"
+            "data/predictions/SPLIT3/yolo_models/predictions_0.csv",
+            "data/predictions/SPLIT3/yolo_models/predictions_1.csv",
+            "data/predictions/SPLIT3/yolo_models/predictions_2.csv",
+            "data/predictions/SPLIT3/yolo_models/predictions_3.csv"
         ],
         [   
-            "data/predictions/SPLIT4/yolo_models/worthy_sweep3/train84/weights/best.pt40/predictions_0.csv",
-            "data/predictions/SPLIT4/yolo_models/worthy_sweep3/train84/weights/best.pt40/predictions_1.csv",
-            "data/predictions/SPLIT4/yolo_models/worthy_sweep3/train84/weights/best.pt40/predictions_2.csv",
-            "data/predictions/SPLIT4/yolo_models/worthy_sweep3/train84/weights/best.pt40/predictions_3.csv"
+            "data/predictions/SPLIT4/yolo_models/predictions_0.csv",
+            "data/predictions/SPLIT4/yolo_models/predictions_1.csv",
+            "data/predictions/SPLIT4/yolo_models/predictions_2.csv",
+            "data/predictions/SPLIT4/yolo_models/predictions_3.csv"
         ],
         [   
-            "data/predictions/SPLIT5/yolo_models/worthy_sweep3/train87/weights/best.pt50/predictions_0.csv",
-            "data/predictions/SPLIT5/yolo_models/worthy_sweep3/train87/weights/best.pt50/predictions_1.csv",
-            "data/predictions/SPLIT5/yolo_models/worthy_sweep3/train87/weights/best.pt50/predictions_2.csv",
-            "data/predictions/SPLIT5/yolo_models/worthy_sweep3/train87/weights/best.pt50/predictions_3.csv"
+            "data/predictions/SPLIT5/yolo_models/predictions_0.csv",
+            "data/predictions/SPLIT5/yolo_models/predictions_1.csv",
+            "data/predictions/SPLIT5/yolo_models/predictions_2.csv",
+            "data/predictions/SPLIT5/yolo_models/predictions_3.csv"
         ]
     ]
         # # Run cross-validation folds in parallel
@@ -297,9 +326,9 @@ def run_experiment(config_file):
         #     results = [future.result() for future in concurrent.futures.as_completed(futures)]
         results = []
         for i in range(1, 6):
-            result = run_fold(config, i, yolo11_cv_files[i-1], detr_cv_files)
-            if result==None:
-                continue
+            result = run_fold(config, i, yolo11_cv_files[i-1], detr_cv_files[i-1])
+            # if result==None:
+            #     continue
             results.append(result)
         # Track metrics
         cv_metrics = {
