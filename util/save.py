@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def save_with_negs(preds: pd.DataFrame):
+def save_with_negs(preds: pd.DataFrame, output_path: str):
     # Keep only necessary columns
     columns = ['Image_ID', 'class', 'confidence', 'xmin', 'ymin', 'xmax', 'ymax']
     preds = preds[columns]
@@ -33,4 +33,4 @@ def save_with_negs(preds: pd.DataFrame):
     final_predictions = pd.concat([preds, neg_formatted])
 
     # Save results with specific columns
-    final_predictions.to_csv('ensembled.csv', index=False)
+    final_predictions.to_csv(output_path, index=False)
