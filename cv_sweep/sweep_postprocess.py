@@ -101,7 +101,7 @@ def create_structured_config(wandb_config):
         
 
 
-def run_fold(config, fold_num, yolo11_cv_files, detr_cv_files):
+def run_fold(config, fold_num, yolo11_cv_files_split, detr_cv_files):
     logging.info(f"Running fold {fold_num}")
 # Track metrics
     cv_metrics = {
@@ -140,21 +140,24 @@ def run_fold(config, fold_num, yolo11_cv_files, detr_cv_files):
     try:
         # Process YOLO predictions
         yolo_dfs = []
-        for tta_flip in range(len(yolo11_cv_files[fold_num - 1])):
-            yolo_df = pd.read_csv(yolo11_cv_files[fold_num - 1][tta_flip])
+         # Process YOLO11
+        logging.info(f"Processing YOLO11 predictions for fold {fold_num}. Will run TTA ensemble.")
+        for tta_flip in range(len(yolo11_cv_files_split)):
+            yolo_df = pd.read_csv(yolo11_cv_files_split[tta_flip])
             yolo_dfs.append(yolo_df)
         yolo_tta_config = create_pipeline_config(
-            config['postprocessing']['ensemble_tta_yolo'],
+            config['postprocessing']['ensemble_ttayolo'],
             config['input']
         )
-        yolo_tta_df = ensemble_class_specific_pipeline(CONFIG=yolo_tta_config, df_list=yolo_dfs, weight_list=[1, 1, 1, 1])
-
+       
+        yolo_tta_df = ensemble_class_specific_pipeline(CONFIG=yolo_tta_config, df_list=yolo_dfs, weight_list=[[1, 1, 1, 1],[1, 1, 1, 1]])#weight list expects 4 weights for troph and wbc
+        logging.info(f"Completed YOLO11 ensembling of TTA predictions for fold {fold_num}")
         yolo_individual_config = create_pipeline_config(
             config['postprocessing']['individual_yolo11'],
             config['input']
         )
         yolo_tta_df = postprocessing_pipeline(yolo_individual_config, yolo_tta_df)
-
+        logging.info(f"Completed YOLO11 postprocessing for fold {fold_num}")
 
             # Process DETR predictions
         detr_file = detr_cv_files[fold_num - 1]
@@ -166,15 +169,19 @@ def run_fold(config, fold_num, yolo11_cv_files, detr_cv_files):
         detr_df = postprocessing_pipeline(detr_pipeline_config, detr_df)
         # Apply DETR weight to confidence scores
 
-        
         # Final ensemble
-        
+        logging.info(f"Running final ensemble for fold {fold_num}")
         final_pipeline_config = create_pipeline_config(
             config['postprocessing']['ensemble_all'],
             config['input']
         )
-        all_df = ensemble_class_specific_pipeline(CONFIG=final_pipeline_config, df_list=[yolo_tta_df, detr_df], weight_list=[config['yolo_weight'], config['detr_weight']])
-
+        final_weights = [[config['troph_weights']['yolo_weight'], config['troph_weights']['detr_weight']],
+                         [config['wbc_weights']['yolo_weight'], config['wbc_weights']['detr_weight']]]
+        all_df = ensemble_class_specific_pipeline(
+            CONFIG=final_pipeline_config,
+            df_list=[yolo_tta_df, detr_df],
+            weight_list=final_weights
+        )
         # Calculate metrics
         map_score, ap_dict, lamr_dict = score_on_validation_set(
             df=all_df,
@@ -182,6 +189,7 @@ def run_fold(config, fold_num, yolo11_cv_files, detr_cv_files):
             split_csv=config['input']['SPLIT_CSV'],
             train_csv=config['input']['TRAIN_CSV']
         )
+        logging.info(f"Completed final ensemble for fold {fold_num}")
         
         
         # Calculate and log mean metrics
@@ -219,7 +227,15 @@ def run_fold(config, fold_num, yolo11_cv_files, detr_cv_files):
                 "early_stopped": True,
                 "completed_folds": 1
             })
-            return  # Exit this trial and move to next wandb suggestion
+            return None # Exit this trial and move to next wandb suggestion
+        
+        return {
+            "mAP": map_score,
+            "AP_troph": ap_dict['Trophozoite'],
+            "AP_WBC": ap_dict['WBC'],
+            "lamr_troph": lamr_dict['Trophozoite'],
+            "lamr_WBC": lamr_dict['WBC']
+        }
     except:
         logging.exception(f"Error running fold {fold_num}")
 
@@ -229,19 +245,62 @@ def run_experiment(config_file):
     with wandb.init(project="final_pp_sweep") as run:
         # Load base config and update with wandb parameters
         logging.info(f"Running experiment with config file: {config_file}")
-        base_config = load_yaml_config(config_file)
+        # base_config = load_yaml_config(config_file)
         config = create_structured_config(wandb.config)
 
         print(config)
-
+        best_config_path = os.path.join(wandb.run.dir, 'best_config.yaml')
+        with open(best_config_path, 'w') as f:
+            yaml.dump(config, f)
         # Cross-validation files
-        detr_cv_files = [""]   #TODO: fix this
-        yolo11_cv_files = [["","","",""], ["","","",""], ["","","",""], ["","","",""], ["","","",""]]#5 folds with 4 tta
-        # Run cross-validation folds in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            futures = [executor.submit(run_fold, config, i, yolo11_cv_files, detr_cv_files) for i in range(1, 6)]
-            results = [future.result() for future in concurrent.futures.as_completed(futures)]
-
+        detr_cv_files = ["csv_cv/detr_911/fold_1.csv",
+                         "csv_cv/detr_911/fold_2.csv",
+                         "csv_cv/detr_911/fold_3.csv",
+                         "csv_cv/detr_911/fold_4.csv",
+                         "csv_cv/detr_911/fold_5.csv"
+                         ]   #TODO: fix this and infer
+        yolo11_cv_files = [
+        [
+            "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_0.csv",
+            "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_1.csv",
+            "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_2.csv",
+            "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_3.csv"
+        ],
+        [   
+            "data/predictions/SPLIT2/yolo_models/worthy_sweep3/train79/weights/best.pt20/predictions_0.csv",
+            "data/predictions/SPLIT2/yolo_models/worthy_sweep3/train79/weights/best.pt20/predictions_1.csv",
+            "data/predictions/SPLIT2/yolo_models/worthy_sweep3/train79/weights/best.pt20/predictions_2.csv",
+            "data/predictions/SPLIT2/yolo_models/worthy_sweep3/train79/weights/best.pt20/predictions_3.csv"
+        ],
+        [   
+            "data/predictions/SPLIT3/yolo_models/worthy_sweep3/train81/weights/best.pt30/predictions_0.csv",
+            "data/predictions/SPLIT3/yolo_models/worthy_sweep3/train81/weights/best.pt30/predictions_1.csv",
+            "data/predictions/SPLIT3/yolo_models/worthy_sweep3/train81/weights/best.pt30/predictions_2.csv",
+            "data/predictions/SPLIT3/yolo_models/worthy_sweep3/train81/weights/best.pt30/predictions_3.csv"
+        ],
+        [   
+            "data/predictions/SPLIT4/yolo_models/worthy_sweep3/train84/weights/best.pt40/predictions_0.csv",
+            "data/predictions/SPLIT4/yolo_models/worthy_sweep3/train84/weights/best.pt40/predictions_1.csv",
+            "data/predictions/SPLIT4/yolo_models/worthy_sweep3/train84/weights/best.pt40/predictions_2.csv",
+            "data/predictions/SPLIT4/yolo_models/worthy_sweep3/train84/weights/best.pt40/predictions_3.csv"
+        ],
+        [   
+            "data/predictions/SPLIT5/yolo_models/worthy_sweep3/train87/weights/best.pt50/predictions_0.csv",
+            "data/predictions/SPLIT5/yolo_models/worthy_sweep3/train87/weights/best.pt50/predictions_1.csv",
+            "data/predictions/SPLIT5/yolo_models/worthy_sweep3/train87/weights/best.pt50/predictions_2.csv",
+            "data/predictions/SPLIT5/yolo_models/worthy_sweep3/train87/weights/best.pt50/predictions_3.csv"
+        ]
+    ]
+        # # Run cross-validation folds in parallel
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        #     futures = [executor.submit(run_fold, config, i, yolo11_cv_files[i-1], detr_cv_files) for i in range(1, 6)]
+        #     results = [future.result() for future in concurrent.futures.as_completed(futures)]
+        results = []
+        for i in range(1, 6):
+            result = run_fold(config, i, yolo11_cv_files[i-1], detr_cv_files)
+            if result==None:
+                continue
+            results.append(result)
         # Track metrics
         cv_metrics = {
             "mAP": [],
@@ -253,19 +312,22 @@ def run_experiment(config_file):
 
         # Collect metrics from results
         for result in results:
-            fold_num = result["fold_num"]
-            logging.info(f"Fold {fold_num} metrics: mAP: {result['mAP']}, AP_Troph: {result['AP_troph']}, AP_WBC: {result['AP_WBC']}, LAMR_Troph: {result['lamr_troph']}, LAMR_WBC: {result['lamr_WBC']}")
+            logging.info(f"metrics: mAP: {result['mAP']}, AP_Troph: {result['AP_troph']}, AP_WBC: {result['AP_WBC']}, LAMR_Troph: {result['lamr_troph']}, LAMR_WBC: {result['lamr_WBC']}")
             
             cv_metrics["mAP"].append(result["mAP"])
             cv_metrics["AP_troph"].append(result["AP_troph"])
             cv_metrics["AP_WBC"].append(result["AP_WBC"])
             cv_metrics["lamr_troph"].append(result["lamr_troph"])
             cv_metrics["lamr_WBC"].append(result["lamr_WBC"])
+            wandb.log(result)
 
         # Calculate and log mean metrics
         mean_metrics = {k: np.mean(v) for k, v in cv_metrics.items()}
         logging.info(f"Mean metrics: {mean_metrics}")
         wandb.log(mean_metrics)
+        
+
+        
 
         # Save best configuration
         if mean_metrics['mAP'] > wandb.run.summary.get('best_AP_mean', 0):
@@ -276,13 +338,13 @@ def run_experiment(config_file):
             logging.info(f"Best configuration saved to {best_config_path}")
 
 
-def run_multiple_experiments(config_files):
-    # Run multiple experiments in parallel
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        futures = [executor.submit(run_experiment, config_file) for config_file in config_files]
-        concurrent.futures.wait(futures)
+# def run_multiple_experiments(config_files):
+#     # Run multiple experiments in parallel
+#     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+#         futures = [executor.submit(run_experiment, config_file) for config_file in config_files]
+#         concurrent.futures.wait(futures)
 
 
 if __name__ == "__main__":
     config_files = ["parameters/postprocessing_config_files/class_specific_sweep.yaml"]  # Add more config files as needed
-    run_multiple_experiments(config_files)
+    run_experiment(config_files)
