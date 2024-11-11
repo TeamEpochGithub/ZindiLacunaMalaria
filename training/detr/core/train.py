@@ -27,6 +27,7 @@ def train_one_epoch(config, model, optimizer, scheduler, train_data_loader, devi
 
             if (i + 1) % config['training']['n_accum'] == 0:
                 optimizer.step()
+                optimizer.zero_grad()
 
                 if ema is not None:
                     ema.update()  # Update EMA

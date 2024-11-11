@@ -8,6 +8,7 @@ from preprocessing.dataset_yolo_format import save_dataset_in_yolo
 from preprocessing.filter_boxes import get_filtered_train_df
 from training.yolo.train_yolo_models import get_trained_yolo_models
 from training.detr.train_detr_models import get_trained_detr_models
+import torch
 
 # --- PREPROCESSING ---
 train_df = pd.read_csv('data/csv_files/Train.csv')
@@ -40,7 +41,6 @@ final_preds: dict[str, list[pd.DataFrame]] = {}
 for model in yolo_models:
     yolo_preds = yolo_predict_tta(model, img_paths=test_images_paths)
     final_preds[f'yolo_{model.model_name}'] = yolo_preds
-
 
 # Get predictions for DETR using TTA
 detr_config_files = glob.glob('config_files/detr_train_config_files/*.yaml')

@@ -7,32 +7,32 @@ model:
   activation_dropout: 0.27
   activation_function: "relu"
   assign_first_stage: false
-  attention_dropout: 0.11
+  attention_dropout: 0.1173775017744976
   auxiliary_loss: true
   backbone_config:
     model_type: "resnet"
     out_features: ["stage2", "stage3", "stage4"]
     out_indices: [2, 3, 4]
-  bbox_cost: 4
-  bbox_loss_coefficient: 5.28
-  class_cost: 1.75
+  bbox_cost: 4.997544849490023
+  bbox_loss_coefficient: 6.562316857573485
+  class_cost: 1.3544558661739805
   d_model: 256
   decoder_attention_heads: 8
   decoder_ffn_dim: 2048
   decoder_layerdrop: 0.0
   decoder_layers: 6
-  decoder_n_points: 8
+  decoder_n_points: 4
   dice_loss_coefficient: 1
-  dropout: 0.12
+  dropout: 0.13671849268201017
   encoder_attention_heads: 8
   encoder_ffn_dim: 2048
   encoder_layerdrop: 0.0
   encoder_layers: 6
   encoder_n_points: 4
-  eos_coefficient: 0.11
+  eos_coefficient: 0.10378087674123718
   focal_alpha: 0.25
-  giou_cost: 1.75
-  giou_loss_coefficient: 6.65
+  giou_cost: 2.3066757717517863
+  giou_loss_coefficient: 5.5704723033706625
   init_std: 0.02
   init_xavier_std: 1.0
   is_encoder_decoder: true
@@ -41,7 +41,7 @@ model:
   num_feature_levels: 5
   position_embedding_type: "sine"
   two_stage: true
-  two_stage_num_proposals: 350
+  two_stage_num_proposals: 250
   with_box_refine: true
 
 processor:
@@ -60,36 +60,36 @@ processor:
 transforms:
   train:
     hflip_prob: 0.38
-    vflip_prob: 0.10
-    rotate_prob: 0.49
-    rotate_degrees: 145.01
-    blur_prob: 0.47
+    vflip_prob: 0.08572382253241186
+    rotate_prob: 0.46832917061244705
+    rotate_degrees: 157.22864303872728
+    blur_prob: 0.4421811549879675
     blur_kernel_size: [9, 9]
     blur_sigma: [0.5, 1.0]
-    brightness: 0.11
-    contrast: 0.16
+    brightness: 0.1285055168488631
+    contrast: 0.17789736974061487
     saturation: 0.5
     hue: 0.165
-    color_jitter_prob: 0.27
-    gray_prob: 0.22
-    crop_prob: 0.38
-    crop_scale_min: 0.68
-    crop_scale_max: 1.01
+    color_jitter_prob: 0.2557543961091192
+    gray_prob: 0.2509966921026859
+    crop_prob: 0.3109808557679582
+    crop_scale_min: 0.6117717419448095
+    crop_scale_max: 1.027306543318069
     plasma_brightness_roughness: [0.5, 0.5]
     plasma_brightness_prob: 0.17
     posterize_bits: 7
-    posterize_prob: 0.18
-    saturation_prob: 0.09
-    solarize_threshold: 0.90
-    solarize_addition: 0.09
+    posterize_prob: 0.1485244952469192
+    saturation_prob: 0.08706329514606918
+    solarize_threshold: 0.7635705903322715
+    solarize_addition: 0.08462489921053828
     solarize_prob: 0.24
     affine_degrees: [-15, 15]
     affine_translate: [0.1, 0.1]
     affine_scale: [0.8, 1.2]
     affine_shear: [-5, 5]
-    affine_prob: 0.33
+    affine_prob: 0.2992668778991876
     hue_range: [-0.5, 0.5]
-    hue_prob: 0.20
+    hue_prob: 0.1928332011472766
     sharpness: 0.27
     sharpness_prob: 0.01
   validation: {}
@@ -102,13 +102,13 @@ testing:
 
 training:
   train_batch_size: 4
-  n_accum: 3
-  num_epochs: 5
+  n_accum: 1
+  num_epochs: 60
   learning_rate: 0.0004630770829815448
   warmup_steps: 1200
 
 ema:
   enabled: true
   beta: 0.9999
-  update_after_step: 100
+  update_after_step: 500
   update_every: 1

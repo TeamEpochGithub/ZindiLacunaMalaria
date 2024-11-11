@@ -9,13 +9,14 @@ from torch.utils.data import DataLoader
 from PIL import Image
 from .core.datasets.detr_dataset import MalariaDataset, Collator
 from .core.model import get_processor
-from inference.tta import get_img_tta_augs
+from inference.tta import get_img_tta_augs, deaugment_boxes
 from einops import rearrange
 
 
-def detr_predict_tta(model, config_file, img_paths, device='cuda:0', conf: float = 0.0):
+def detr_predict_tta(model, config_file, img_paths, conf: float = 0.0):
     # Setup processor
     config_dict = dict(yaml.safe_load(open(config_file)))
+    device = config_dict['device']
     processor = get_processor(config_dict.pop('processor'))
     batch_size = config_dict['testing']['test_batch_size']
 
@@ -92,19 +93,31 @@ def detr_predict_tta(model, config_file, img_paths, device='cuda:0', conf: float
                 for img_idx, (image_id, results) in enumerate(zip(batch_ids, processed_results)):
                     final_predictions = []
                     
-                    for score, label, box in zip(results['scores'], 
-                                               results['labels'], 
-                                               results['boxes']):
-                        pred_dict = {
-                            'Image_ID': image_id,
-                            'class': model.config.id2label[label.item()],
-                            'confidence': score.item(),
-                            'xmin': box[0].item(),
-                            'ymin': box[1].item(),
-                            'xmax': box[2].item(),
-                            'ymax': box[3].item()
-                        }
-                        final_predictions.append(pred_dict)
+                    if len(results['boxes']) > 0:
+                        # Get image dimensions for deaugmentation
+                        img = Image.open(os.path.join(img_dir, image_id))
+                        h, w = img.size[::-1]  # height, width
+                        
+                        # Convert boxes to numpy for easier manipulation
+                        boxes = results['boxes'].cpu().numpy()
+                        
+                        # Deaugment the boxes
+                        boxes = deaugment_boxes(boxes, h, w, aug_idx)
+                        
+                        # Create predictions with deaugmented boxes
+                        for score, label, box in zip(results['scores'], 
+                                                   results['labels'], 
+                                                   boxes):
+                            pred_dict = {
+                                'Image_ID': image_id,
+                                'class': model.config.id2label[label.item()],
+                                'confidence': score.item(),
+                                'xmin': box[0],
+                                'ymin': box[1],
+                                'xmax': box[2],
+                                'ymax': box[3]
+                            }
+                            final_predictions.append(pred_dict)
                     
                     if len(results['boxes']) == 0:
                         neg_pred = {
