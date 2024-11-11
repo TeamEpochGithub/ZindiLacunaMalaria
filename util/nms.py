@@ -67,3 +67,38 @@ def apply_nms(df, iou_threshold=0.5):
     print(f"Number of boxes after NMS: {len(df_result)}")
 
     return df_result
+
+def apply_class_specific_nms(df, iou_threshold_troph=0.5, iou_threshold_wbc=0.5):
+    df_troph = df[df['class'] == 'Trophozoite']
+    df_wbc = df[df['class'] == 'WBC']
+    df_neg = df[df['class'] == 'NEG']
+
+    results_troph = []
+    results_wbc = []
+
+    if not df_troph.empty:
+        grouped_troph = df_troph.groupby('Image_ID')
+        for image_id, group in grouped_troph:
+            boxes = group[['xmin', 'ymin', 'xmax', 'ymax']].values.astype(float)
+            scores = group['confidence'].values.astype(float)
+            keep = _non_max_suppression(boxes, scores, iou_threshold_troph)
+            results_troph.append(group.iloc[keep])
+
+    if not df_wbc.empty:
+        grouped_wbc = df_wbc.groupby('Image_ID')
+        for image_id, group in grouped_wbc:
+            boxes = group[['xmin', 'ymin', 'xmax', 'ymax']].values.astype(float)
+            scores = group['confidence'].values.astype(float)
+            keep = _non_max_suppression(boxes, scores, iou_threshold_wbc)
+            results_wbc.append(group.iloc[keep])
+
+    all_results = []
+    if results_troph:
+        all_results.extend(results_troph)
+    if results_wbc:
+        all_results.extend(results_wbc)
+    if not df_neg.empty:
+        all_results.append(df_neg)
+
+    df_result = pd.concat(all_results, ignore_index=True)
+    return df_result
