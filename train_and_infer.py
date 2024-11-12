@@ -106,3 +106,4 @@ final_submission_df.to_csv("submissions/final_submission.csv", index=False)
 
 inference_time = time() - inference_start
 print(f"Inference took {inference_time / 3600:.2f} hours")
+#maddy
