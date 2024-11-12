@@ -1,4 +1,5 @@
 data/img/*
+data/predictions/*
 csv_cv/*
 wandb/*
 temp_files/*
