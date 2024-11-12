@@ -2,46 +2,134 @@ import glob
 import os
 
 import pandas as pd
-from scipy.stats import describe
-from tqdm import tqdm
 
-from postprocessing.ensemble import DualEnsemble
-from util.save import save_with_negs
+from util.save import add_negs_to_submission
+from util.yaml_structuring import create_structured_config, load_yaml_config
+from postprocessing.postprocess_functions import postprocessing_pipeline, ensemble_class_specific_pipeline
+import logging
 
-ens_yolo = DualEnsemble(form="wbf", iou_threshold=0.7, conf_threshold=0.1,
-                        weights=[1, 1, 1, 1],
-                        wbf_reduction='mean')
+def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
+    logging.info(f"Running fold {fold_num}")
+    
 
-ens_detr = DualEnsemble(form="wbf", iou_threshold=0.5, conf_threshold=0.1,
-                        weights=[1],
-                        wbf_reduction='mean')
+    def create_pipeline_config(stage_config, base_paths):
+        pipeline_config = {
+            'DATA_DIR': base_paths['DATA_DIR'],
+            'NEG_CSV': base_paths['NEG_CSV'],
+            'TEST_CSV': base_paths['TEST_CSV'],
+            'TRAIN_CSV': base_paths['TRAIN_CSV'],
+            'SPLIT_CSV': base_paths['SPLIT_CSV'],
+            'fold_num': fold_num,
+        }
 
-ens_final = DualEnsemble(form="wbf", iou_threshold=0.5, conf_threshold=0.1,
-                         weights=[1, 1],
-                         wbf_reduction='mean')
+        # Handle class-specific parameters
+        if 'troph_params' in stage_config:
+            for key, value in stage_config['troph_params'].items():
+                pipeline_config[f'troph_{key}'] = value
+        if 'wbc_params' in stage_config:
+            for key, value in stage_config['wbc_params'].items():
+                pipeline_config[f'wbc_{key}'] = value
 
-predictions_folder = 'data/predictions'
-preds_per_model_folder = [f.path for f in os.scandir(predictions_folder) if f.is_dir()]
+        # Add any non-class-specific parameters
+        for key, value in stage_config.items():
+            if key not in ['troph_params', 'wbc_params']:
+                pipeline_config[key] = value
 
-preds_per_model = {}
+        return pipeline_config
 
-for f in preds_per_model_folder:
-    preds_per_model[f.split("/")[-1]] = glob.glob(f"{f}/*.csv")
+    # Process YOLO predictions
+    yolo_dfs = []
+        # Process YOLO11
+    logging.info(f"Processing YOLO11 predictions for fold {fold_num}. Will run TTA ensemble.")
+    for tta_flip in range(len(yolo11_cv_files_split)):
+        yolo_df = pd.read_csv(yolo11_cv_files_split[tta_flip])
+        yolo_dfs.append(yolo_df)
+    yolo_tta_config = create_pipeline_config(
+        config['postprocessing']['ensemble_ttayolo'],
+        config['input']
+    )
+    print(len(yolo_dfs))
+    print(yolo_tta_config)
+    yolo_tta_df = ensemble_class_specific_pipeline(CONFIG=yolo_tta_config, df_list=yolo_dfs, weight_list=[[1, 1, 1, 1],[1, 1, 1, 1]])#weight list expects 4 weights for troph and wbc
+    logging.info(f"Completed YOLO11 ensembling of TTA predictions for fold {fold_num}")
+    yolo_individual_config = create_pipeline_config(
+        config['postprocessing']['individual_yolo11'],
+        config['input']
+    )
+    yolo_tta_df = postprocessing_pipeline(yolo_individual_config, yolo_tta_df)
+    logging.info(f"Completed YOLO11 postprocessing for fold {fold_num}")
 
-model_preds = []
+    # Process DETR predictions
+    detr_dfs = []
+    for tta_flip in range(len(detr_cv_files)):
+        detr_df = pd.read_csv(detr_cv_files[tta_flip])
+        detr_dfs.append(detr_df)
+    detr_tta_config = create_pipeline_config(
+        config['postprocessing']['ensemble_ttadetr'],
+        config['input']
+    )   
+    detr_tta_df = ensemble_class_specific_pipeline(CONFIG=detr_tta_config, df_list=detr_dfs, weight_list=[[1, 1, 1, 1],[1, 1, 1, 1]])#weight list expects 4 weights for troph and wbc
+    logging.info(f"Completed DETR ensembling of TTA predictions for fold {fold_num}")
+    detr_individual_config = create_pipeline_config(
+        config['postprocessing']['individual_detr'],
+        config['input']
+    )
+    detr_df = postprocessing_pipeline(detr_individual_config, detr_tta_df)
+    # Apply DETR weight to confidence scores
 
-# ensemble predictions per model
-for k, v in tqdm(preds_per_model.items(), desc="Combining model output"):
-    preds_dfs = []
-    for pred_path in v:
-        preds_dfs.append(pd.read_csv(pred_path))
+    # Final ensemble
+    logging.info(f"Running final ensemble for fold {fold_num}")
+    final_pipeline_config = create_pipeline_config(
+        config['postprocessing']['ensemble_all'],
+        config['input']
+    )
+    final_weights = [[config['troph_weights']['yolo_weight'], config['troph_weights']['detr_weight']],
+                        [config['wbc_weights']['yolo_weight'], config['wbc_weights']['detr_weight']]]
+    all_df = ensemble_class_specific_pipeline(
+        CONFIG=final_pipeline_config,
+        df_list=[yolo_tta_df, detr_df],
+        weight_list=final_weights
+    )
 
-    if k == 'yol':
-        model_preds.append(ens_yolo(preds_dfs))
-    elif k == 'det':
-        model_preds.append(preds_dfs[0])
+    all_df = postprocessing_pipeline(final_pipeline_config, all_df)
 
-# ensamble predictions final
-final_preds = ens_final(model_preds)
+    
+    logging.info(f"Completed final ensemble for fold {fold_num}")
+    return all_df
+        
 
-save_with_negs(final_preds)
+if __name__ == '__main__':
+    config_file = "parameters/postprocessing_config_files/vocal_sweep_53.yaml"
+    config = load_yaml_config(config_file)
+    print(config)
+    param_config = create_structured_config(config["parameters"])
+    print("\n",param_config)
+    # Cross-validation files
+    detr_cv_files =     ["data/predictions/test_marcin_pp/tta_pred_1_pp.csv",
+                        "data/predictions/test_marcin_pp/tta_pred_2_pp.csv",
+                        "data/predictions/test_marcin_pp/tta_pred_3_pp.csv",
+                        "data/predictions/test_marcin_pp/tta_pred_4_pp.csv"
+                        ]   #TODO
+
+
+# ["data/predictions/test_1112/tta_pred_1.csv",
+#                         "data/predictions/test_1112/tta_pred_2.csv",
+#                         "data/predictions/test_1112/tta_pred_3.csv",
+#                         "data/predictions/test_1112/tta_pred_4.csv"
+#                         ]   #TODO
+    
+
+    yolo11_cv_files = [
+        "data/predictions/yolo_test/yol/predictions_1.csv",
+        "data/predictions/yolo_test/yol/predictions_2.csv",
+        "data/predictions/yolo_test/yol/predictions_3.csv",
+        "data/predictions/yolo_test/yol/predictions_4.csv"
+    
+        
+    ]
+
+    all_df = run_postprocessing(param_config, 1, yolo11_cv_files, detr_cv_files)
+    neg_all_df = add_negs_to_submission(df=all_df, neg_csv="data/csv_files/NEG_OR_NOT.csv",test_csv="data/csv_files/Test.csv")
+    neg_all_df.to_csv("submissions/vocal_sweep_53_marcin.csv", index=False)
+ 
+    
