@@ -51,40 +51,23 @@ The structure should look like this:
 
 ```
 data/
-    ├── csv_files/ #folder 
+    ├── csv_files/
     ├── img/
     
 ```
 
-### 5. Main files explanation
+### 5. Main file explanation
 
-- `train.py`: This file is used to train a model. `train.py` reads a configuration file from `conf/train.yaml`. This configuration file 
-contains the model configuration to train with additional training parameters such as test_size and a scorer to use. 
-The model selected in the `conf/train.yaml` can be found in the `conf/model` folder where a whole model configuration is stored (from preprocessing to postprocessing).
-When training is finished, the model is saved in the `tm` directory with a hash that depends on the specific pre-processing, pretraining steps + the model configurations.
+- `main.py`: This code preprocesses the training dataset by filtering redundant bounding boxes, trains YOLO and DETR models using configuration files, and trains a separate NEG model. It performs inference on test images using these models and Test Time Augmentation (TTA). The NEG predictions are saved in a CSV file and YOLO/DETR predictions in separate CSV files for each model. The results are stored in the data/predictions folder, with filenames indicating the model and split. The csv files are post processed, and saved in submissions/final_submission.csv.
 
-    - Command line arguments
-    - CUDA_VISIBLE_DEVICES: The GPU to use for training. If not specified it uses DataParallel to train on multiple GPUs.  If you have multiple GPUs, you can specify which one to use.
-- `submit.py`: This file does inference on the test data from the competition given trained model or an ensemble of trained models. 
-It reads a configuration file from `conf/submit.yaml` which contains the model/ensemble configuration to use for inference.
-Model configs can be found in the `conf/model` folder and ensemble configs in the `conf/ensemble` folder. The `conf/ensemble`
-folder specifies the models (`conf/model`) to use for the ensemble and the weights to use for each model. The `submit.py` 
+## Contributors
 
-### 6. Place the fitted models
-(For DrivenData) Any additional supplied trained models /scalers (.pt / .gbdt / .scaler) should be placed in the `tm` directory. 
-When these models were trained, they are saved with a hash that depends on the specific pre-processing, pretraining steps + the model configurations.
-In this way, we ensure that we load the correct saved model automatically when running `submit.py`.
+This repository was created by [Team Epoch V](https://teamepoch.ai/team#v), based in the [Dream Hall](https://www.tudelft.nl/ddream) of the [Delft University of Technology](https://www.tudelft.nl/).
 
-### 7. Run submit.py
+Read more about this competition [here](https://teamepoch.ai/competitions).
 
-For reproducing our best submission, run `submit.py`. This will load the already configured `submit.yaml` file and
-run the inference on the test data from the competition. `submit.yaml` in configured to what whe think is our best and our
-most robust solution:
-![img.png](images/best_submission.png)
-`conf/ensemble/21-02-1st.yaml` contains a mixed ensemble of models trained on different feature sets, including UNets with VGG encoders, SwinTransformers and a ConvNext model.
-
-
-If you get an error of that the path was not found of a model. Please ensure that you have the correct trained model in the `tm` directory.
-If you don't have the trained models, you can train them 1 by 1 using `train.py` and the `conf/train.yaml` file.
-
-`submit.py` will output a `submission.zip` in the root of the project directory. This file can be uploaded to the competition page. 
+[![Github Badge](https://img.shields.io/badge/-Emiel_Witting-24292e?style=flat&logo=Github)](https://github.com/EWitting)
+[![Github Badge](https://img.shields.io/badge/-Jeffrey_Lim-24292e?style=flat&logo=Github)](https://github.com/Jeffrey-Lim)
+[![Github Badge](https://img.shields.io/badge/-Hugo_de_Heer-24292e?style=flat&logo=Github)](https://github.com/hjdeheer)
+[![Github Badge](https://img.shields.io/badge/-Jasper_van_Selm-24292e?style=flat&logo=Github)](https://github.com/schobbejak)
+[![Github Badge](https://img.shields.io/badge/-Tolga_Kopar-24292e?style=flat&logo=Github)](https://github.com/tolgakopar)
