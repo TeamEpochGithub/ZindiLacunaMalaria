@@ -168,38 +168,33 @@ def run_yolo_postprocessing(config, fold_num, yolo11_cv_files_split):
 
 
 if __name__ == '__main__':
-    config_file = "parameters/postprocessing_config_files/quiet_sweep_435.yaml"
+    config_file = "parameters/postprocessing_config_files/vocal_sweep_53.yaml"
     config = load_yaml_config(config_file)
     print(config)
     param_config = create_structured_config(config["parameters"])
     print("\n",param_config)
     # Cross-validation files
-    detr_cv_files = ["csv_cv/detr_911/fold_1.csv",
-                        "csv_cv/detr_911/fold_2.csv",
-                        "csv_cv/detr_911/fold_3.csv",
-                        "csv_cv/detr_911/fold_4.csv",
-                        "csv_cv/detr_911/fold_5.csv"
+    detr_cv_files = ["data/predictions/test_1112/tta_pred_1.csv",
+                        "data/predictions/test_1112/tta_pred_2.csv",
+                        "data/predictions/test_1112/tta_pred_3.csv",
+                        "data/predictions/test_1112/tta_pred_4.csv"
                         ]   #TODO
-    yolo11_cv_files = [
     
-        "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_0.csv",
-        "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_1.csv",
-        "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_2.csv",
-        "data/predictions/SPLIT1/yolo_models/worthy_sweep3/train77/weights/best.pt10/predictions_3.csv"
+    # [data/predictions/test_marcin_pp/tta_pred_1_pp.csv,
+    # data/predictions/test_marcin_pp/tta_pred_2_pp.csv,
+    # data/predictions/test_marcin_pp/tta_pred_3_pp.csv,
+    # data/predictions/test_marcin_pp/tta_pred_4_pp.csv]
+    yolo11_cv_files = [
+        "data/predictions/yolo_test/yol/predictions_1.csv",
+        "data/predictions/yolo_test/yol/predictions_2.csv",
+        "data/predictions/yolo_test/yol/predictions_3.csv",
+        "data/predictions/yolo_test/yol/predictions_4.csv"
+    
+        
     ]
 
     all_df = run_postprocessing(param_config, 1, yolo11_cv_files, detr_cv_files)
-    all_df.to_csv("submissions/quiet_sweep_435_all.csv", index=False)
     neg_all_df = add_negs_to_submission(df=all_df, neg_csv="data/csv_files/NEG_OR_NOT.csv",test_csv="data/csv_files/Test.csv")
-    neg_all_df.to_csv("submissions/quiet_sweep_435.csv", index=False)
-    neg_ids = neg_all_df.loc[neg_all_df['class'] == 'NEG', 'Image_ID'].unique()
-    neg_before_ids = all_df.loc[all_df['class'] == 'NEG', 'Image_ID'].unique()
-    print(set(neg_ids) - set(neg_before_ids))
-
-    all_yolo_df = run_yolo_postprocessing(param_config, 1, yolo11_cv_files)
-    all_yolo_df.to_csv("submissions/quiet_sweep_435_yolo_all.csv", index=False)
-    neg_all_yolo_df = add_negs_to_submission(df=all_yolo_df, neg_csv="data/csv_files/NEG_OR_NOT.csv",test_csv="data/csv_files/Test.csv")
-    neg_all_yolo_df.to_csv("submissions/quiet_sweep_435_yolo.csv", index=False)
-    neg_ids_yolo = neg_all_yolo_df.loc[neg_all_yolo_df['class'] == 'NEG', 'Image_ID'].unique()
-    neg_before_ids_yolo = all_yolo_df.loc[all_yolo_df['class'] == 'NEG', 'Image_ID'].unique()
-    print(set(neg_ids_yolo) - set(neg_before_ids_yolo))
+    neg_all_df.to_csv("submissions/vocal_sweep_53.csv", index=False)
+ 
+    

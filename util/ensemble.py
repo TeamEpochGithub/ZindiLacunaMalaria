@@ -210,13 +210,13 @@ class Ensemble:
     
 if __name__ == "__main__":
     # ensemble = Ensemble(form="nms", iou_threshold=0.5)
-    ensemble = Ensemble(form="wbf", iou_threshold=0.5, conf_threshold=0.1, weights=[1, 1], wbf_reduction='mean')
-    file1 = pd.read_csv('predictions1.csv')
-    file2 = pd.read_csv('predictions2.csv')
-    img_ids = file1['Image_ID'].unique().tolist()[:100]
-    file1 = file1[file1['Image_ID'].isin(img_ids)]
-    file2 = file2[file2['Image_ID'].isin(img_ids)]
-    files = [file1, file2]
+    file_paths = ["data/predictions/test/tta_pred_1.csv", "data/predictions/test/tta_pred_2.csv", "data/predictions/test/tta_pred_3.csv", "data/predictions/test/tta_pred_4.csv"]
+    ensemble = DualEnsemble(form="nms", iou_threshold=0.65, conf_threshold=0.0, weights=[1, 1, 1, 1], classes=["Trophozoite", "WBC"],wbf_reduction='mean')
+    
+
+    files = [pd.read_csv(file_path) for file_path in file_paths]
     ensembled = ensemble(files)
-    ensembled.to_csv('ensembled.csv', index=False)
+    from util.save import add_negs_to_submission
+    ensembled = add_negs_to_submission(ensembled, "data/csv_files/NEG_OR_NOT.csv", "data/csv_files/Test.csv")
+    ensembled.to_csv('submissions/nms_ensembled_detr.csv', index=False)
     print(ensembled.head())
