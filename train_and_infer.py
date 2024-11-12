@@ -79,20 +79,23 @@ for model, config_file in zip(detr_models, detr_config_files):
 
 # Save the final predictions to disk
 os.makedirs('data/predictions', exist_ok=True)
+tta_files = []
 for model_name, preds in final_preds.items():
     for i, df in enumerate(preds):
-        df.to_csv(f'data/predictions/{model_name[:3]}_predictions_{i + 1}.csv', index=False)
-
+        csv_name = f'data/predictions/{model_name[:3]}_predictions_{i + 1}.csv'
+        df.to_csv(csv_name, index=False)
+        tta_files.append(csv_name)
 # --- POSTPROCESSING ---
-
 config_file = "parameters/postprocessing_config_files/vocal_sweep_53.yaml"
 config = load_yaml_config(config_file)
 param_config = create_structured_config(config["parameters"])
 
-print(final_preds.keys())
-detr_tta_files = final_preds['detr']
-yolo_tta_files = final_preds['yolo']
+# print(final_preds.keys())
+detr_tta_files = [f for f in tta_files if "det" in f]
+yolo_tta_files = [f for f in tta_files if "yol" in f]
 
+# print(detr_tta_files)
+# print(yolo_tta_files)
 all_df = run_postprocessing(param_config, 1, yolo_tta_files, detr_tta_files)
 
 # Add NEG predictions to the final submission
