@@ -418,14 +418,14 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
                 form='nms',
                 iou_threshold=class_config['nms_iou_threshold'],
                 classes=[class_name],
-                conf_threshold=0.0 
+                conf_threshold=0.0001 #TODO
             )
         elif class_config['form'] == 'soft_nms':
             ensemble = DualEnsemble(
                 form='soft_nms',
                 iou_threshold=class_config['nms_iou_threshold'],
                 classes=[class_name],
-                conf_threshold=0.0 
+                conf_threshold=0.0001 #TODO
             )
             
         # Process class predictions

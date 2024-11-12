@@ -65,7 +65,7 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
         detr_df = pd.read_csv(detr_cv_files[tta_flip])
         detr_dfs.append(detr_df)
     detr_tta_config = create_pipeline_config(
-        config['postprocessing']['ensemble_tta_detr'],
+        config['postprocessing']['ensemble_ttadetr'],
         config['input']
     )   
     detr_tta_df = ensemble_class_specific_pipeline(CONFIG=detr_tta_config, df_list=detr_dfs, weight_list=[[1, 1, 1, 1],[1, 1, 1, 1]])#weight list expects 4 weights for troph and wbc
@@ -174,16 +174,20 @@ if __name__ == '__main__':
     param_config = create_structured_config(config["parameters"])
     print("\n",param_config)
     # Cross-validation files
-    detr_cv_files = ["data/predictions/test_1112/tta_pred_1.csv",
-                        "data/predictions/test_1112/tta_pred_2.csv",
-                        "data/predictions/test_1112/tta_pred_3.csv",
-                        "data/predictions/test_1112/tta_pred_4.csv"
+    detr_cv_files =     ["data/predictions/test_marcin_pp/tta_pred_1_pp.csv",
+                        "data/predictions/test_marcin_pp/tta_pred_2_pp.csv",
+                        "data/predictions/test_marcin_pp/tta_pred_3_pp.csv",
+                        "data/predictions/test_marcin_pp/tta_pred_4_pp.csv"
                         ]   #TODO
+
+
+# ["data/predictions/test_1112/tta_pred_1.csv",
+#                         "data/predictions/test_1112/tta_pred_2.csv",
+#                         "data/predictions/test_1112/tta_pred_3.csv",
+#                         "data/predictions/test_1112/tta_pred_4.csv"
+#                         ]   #TODO
     
-    # [data/predictions/test_marcin_pp/tta_pred_1_pp.csv,
-    # data/predictions/test_marcin_pp/tta_pred_2_pp.csv,
-    # data/predictions/test_marcin_pp/tta_pred_3_pp.csv,
-    # data/predictions/test_marcin_pp/tta_pred_4_pp.csv]
+
     yolo11_cv_files = [
         "data/predictions/yolo_test/yol/predictions_1.csv",
         "data/predictions/yolo_test/yol/predictions_2.csv",
@@ -195,6 +199,6 @@ if __name__ == '__main__':
 
     all_df = run_postprocessing(param_config, 1, yolo11_cv_files, detr_cv_files)
     neg_all_df = add_negs_to_submission(df=all_df, neg_csv="data/csv_files/NEG_OR_NOT.csv",test_csv="data/csv_files/Test.csv")
-    neg_all_df.to_csv("submissions/vocal_sweep_53.csv", index=False)
+    neg_all_df.to_csv("submissions/vocal_sweep_53_marcin.csv", index=False)
  
     
