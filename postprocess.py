@@ -18,7 +18,7 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
             'NEG_CSV': base_paths['NEG_CSV'],
             'TEST_CSV': base_paths['TEST_CSV'],
             'TRAIN_CSV': base_paths['TRAIN_CSV'],
-            'SPLIT_CSV': base_paths['SPLIT_CSV'],
+            # 'SPLIT_CSV': base_paths['SPLIT_CSV'],
             'fold_num': fold_num,
         }
 
@@ -48,8 +48,8 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
         config['postprocessing']['ensemble_ttayolo'],
         config['input']
     )
-    print(len(yolo_dfs))
-    print(yolo_tta_config)
+    # print(len(yolo_dfs))
+    # print(yolo_tta_config)
     yolo_tta_df = ensemble_class_specific_pipeline(CONFIG=yolo_tta_config, df_list=yolo_dfs, weight_list=[[1, 1, 1, 1],[1, 1, 1, 1]])#weight list expects 4 weights for troph and wbc
     logging.info(f"Completed YOLO11 ensembling of TTA predictions for fold {fold_num}")
     yolo_individual_config = create_pipeline_config(
@@ -96,7 +96,9 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
     
     logging.info(f"Completed final ensemble for fold {fold_num}")
     return all_df
-        
+
+
+# def run_minimal_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
 
 if __name__ == '__main__':
     config_file = "parameters/postprocessing_config_files/vocal_sweep_53.yaml"

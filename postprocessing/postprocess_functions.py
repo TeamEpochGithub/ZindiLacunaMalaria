@@ -317,17 +317,14 @@ def spatial_density_contour_wbc(
     return df
 
 
-def postprocessing_pipeline(CONFIG, df=None):
+def postprocessing_pipeline(CONFIG, df):
     """Run postprocessing pipeline with the given configuration. If a dataframe is provided, it will be used as input. Otherwise, the input CSV file will be read."""
     # Unpack flags and parameters from CONFIG
     flags = ['use_size_adjustment', 'use_remove_edges', 'use_spatial_density_troph', 'use_spatial_density_wbc']
     params = {key: CONFIG.get(key) for key in CONFIG.keys() if key not in flags}
     
     # Read initial data
-    if df is None:
-        df = pd.read_csv(CONFIG['INPUT_CSV'])
     train_df = pd.read_csv(CONFIG['TRAIN_CSV'])
-    
     # Process bounding boxes
     df = process_df_bbox(df, CONFIG['DATA_DIR'])
     train_df = process_df_bbox(train_df, CONFIG['DATA_DIR'])
@@ -418,14 +415,14 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
                 form='nms',
                 iou_threshold=class_config['nms_iou_threshold'],
                 classes=[class_name],
-                conf_threshold=0.0001 #TODO
+                conf_threshold=0.001 #TODO
             )
         elif class_config['form'] == 'soft_nms':
             ensemble = DualEnsemble(
                 form='soft_nms',
                 iou_threshold=class_config['nms_iou_threshold'],
                 classes=[class_name],
-                conf_threshold=0.0001 #TODO
+                conf_threshold=0.001 #TODO
             )
             
         # Process class predictions

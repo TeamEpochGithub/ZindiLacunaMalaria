@@ -101,3 +101,8 @@ def train_model(img_dir, train_csv, epochs):
         print(f"Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}")
 
     return model
+
+def initialize_model():
+    model = resnet18(pretrained=True)
+    model.fc = nn.Linear(model.fc.in_features, 2)
+    return model
