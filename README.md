@@ -59,7 +59,11 @@ The structure should look like this:
 ```
 data/
     ├── csv_files/
+        ├── Train.csv
+        ├── Test.csv
     ├── img/
+        ├── id_xxxxxxxx.jpg
+        ├── ...
     
 ```
 
