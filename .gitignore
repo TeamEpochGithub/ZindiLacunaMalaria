@@ -1,4 +1,5 @@
 data/img/*
+data/yolo_ds/*
 data/predictions/*
 csv_cv/*
 wandb/*
