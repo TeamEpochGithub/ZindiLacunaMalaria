@@ -1,3 +1,5 @@
+[![Mapping_Kelp_Forests_Social_Preview.png](./assets/malaria_logo.jpg)](https://teamepoch.ai/competitions)
+
 # Lacuna Malaria Detection Challenge
 
 This is Team Epoch's solution to the [Lacuna Malaria Detection Challenge](https://zindi.africa/competitions/lacuna-malaria-detection-challenge), hosted by Zindi. 
