@@ -317,17 +317,14 @@ def spatial_density_contour_wbc(
     return df
 
 
-def postprocessing_pipeline(CONFIG, df=None):
+def postprocessing_pipeline(CONFIG, df):
     """Run postprocessing pipeline with the given configuration. If a dataframe is provided, it will be used as input. Otherwise, the input CSV file will be read."""
     # Unpack flags and parameters from CONFIG
     flags = ['use_size_adjustment', 'use_remove_edges', 'use_spatial_density_troph', 'use_spatial_density_wbc']
     params = {key: CONFIG.get(key) for key in CONFIG.keys() if key not in flags}
     
     # Read initial data
-    if df is None:
-        df = pd.read_csv(CONFIG['INPUT_CSV'])
     train_df = pd.read_csv(CONFIG['TRAIN_CSV'])
-    
     # Process bounding boxes
     df = process_df_bbox(df, CONFIG['DATA_DIR'])
     train_df = process_df_bbox(train_df, CONFIG['DATA_DIR'])

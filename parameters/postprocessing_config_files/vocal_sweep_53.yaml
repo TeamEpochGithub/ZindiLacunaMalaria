@@ -5,16 +5,16 @@ parameters:
   yolo_weight_WBC: 0.978714821091256
 
   input_DATA_DIR: data/img
-  input_NEG_CSV: data/csv_files/NEG_OR_NOT.csv
-  input_SPLIT_CSV: data/csv_files/split_assignment.csv
+  input_NEG_CSV: data/csv_files/NEG_OR_NOT2.csv
+  # input_SPLIT_CSV: data/csv_files/split_assignment.csv
   input_TEST_CSV: data/csv_files/Test.csv
   input_TRAIN_CSV: data/csv_files/Train.csv
-  input_detr_csv_dir: csv_cv/detr_911
-  input_detr_csv_path: submissions/interim/detr.csv
-  input_yolo11_csv_dir: csv_cv/worthy_sweep_3
-  input_yolo9_csv_dir: csv_cv/yolo9_preds
-  input_yolo_csv_paths: ['submissions/interim/predictions_9s_neg_preds_WBCremoved.csv']
-  input_yolo_models_path: parameters/yolo_config_files/*.yaml
+  # input_detr_csv_dir: csv_cv/detr_911
+  # input_detr_csv_path: submissions/interim/detr.csv
+  # input_yolo11_csv_dir: csv_cv/worthy_sweep_3
+  # input_yolo9_csv_dir: csv_cv/yolo9_preds
+  # input_yolo_csv_paths: ['submissions/interim/predictions_9s_neg_preds_WBCremoved.csv']
+  # input_yolo_models_path: parameters/yolo_config_files/*.yaml
 
   output_path: submissions/ensemble_results.csv
 
@@ -120,22 +120,3 @@ parameters:
   postprocessing_individual_yolo11_WBC_size_factor: 0.9194717692255596
   postprocessing_individual_yolo11_WBC_use_remove_edges: True
   postprocessing_individual_yolo11_WBC_use_size_adjustment: True
-
-  postprocessing_individual_yolo9_Trophozoite_border_threshold: 0.914629164768255
-  postprocessing_individual_yolo9_Trophozoite_edge_threshold: 0.06493781973199987
-  postprocessing_individual_yolo9_Trophozoite_size_factor: 1.0331181133070908
-  postprocessing_individual_yolo9_Trophozoite_use_remove_edges: False
-  postprocessing_individual_yolo9_Trophozoite_use_size_adjustment: False
-
-  postprocessing_individual_yolo9_WBC_border_threshold: 0.952756915873637
-  postprocessing_individual_yolo9_WBC_edge_threshold: 0.10427686978394696
-  postprocessing_individual_yolo9_WBC_size_factor: 0.9916474060574316
-  postprocessing_individual_yolo9_WBC_use_remove_edges: True
-  postprocessing_individual_yolo9_WBC_use_size_adjustment: True
-
-
-  yolo11_weight_Trophozoite: 0.9251727375938186
-  yolo11_weight_WBC: 0.9696404551805752
-
-  yolo9_weight_Trophozoite: 0.4724241395771492
-  yolo9_weight_WBC: 0.48652447938970705
