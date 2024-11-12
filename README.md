@@ -66,8 +66,7 @@ This repository was created by [Team Epoch V](https://teamepoch.ai/team#v), base
 
 Read more about this competition [here](https://teamepoch.ai/competitions).
 
-[![Github Badge](https://img.shields.io/badge/-Emiel_Witting-24292e?style=flat&logo=Github)](https://github.com/EWitting)
-[![Github Badge](https://img.shields.io/badge/-Jeffrey_Lim-24292e?style=flat&logo=Github)](https://github.com/Jeffrey-Lim)
-[![Github Badge](https://img.shields.io/badge/-Hugo_de_Heer-24292e?style=flat&logo=Github)](https://github.com/hjdeheer)
-[![Github Badge](https://img.shields.io/badge/-Jasper_van_Selm-24292e?style=flat&logo=Github)](https://github.com/schobbejak)
-[![Github Badge](https://img.shields.io/badge/-Tolga_Kopar-24292e?style=flat&logo=Github)](https://github.com/tolgakopar)
+[![Github Badge](https://img.shields.io/badge/-Emiel_Witting-24292e?style=flat&logo=Github)](https://github.com/MarJarAI)
+[![Github Badge](https://img.shields.io/badge/-Jeffrey_Lim-24292e?style=flat&logo=Github)](https://github.com/madhavv197)
+[![Github Badge](https://img.shields.io/badge/-Hugo_de_Heer-24292e?style=flat&logo=Github)](https://github.com/FBB0)
+[![Github Badge](https://img.shields.io/badge/-Jasper_van_Selm-24292e?style=flat&logo=Github)](https://github.com/Blagues)
