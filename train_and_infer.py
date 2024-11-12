@@ -91,7 +91,7 @@ param_config = create_structured_config(config["parameters"])
 
 print(final_preds.keys())
 detr_tta_files = final_preds['detr']
-yolo_tta_files = yolo_preds['yolo']
+yolo_tta_files = final_preds['yolo']
 
 all_df = run_postprocessing(param_config, 1, yolo_tta_files, detr_tta_files)
 
