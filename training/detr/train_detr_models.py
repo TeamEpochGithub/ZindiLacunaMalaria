@@ -10,13 +10,13 @@ def get_trained_detr_models(config_files, dataset_path) -> list:
         config_dict = dict(yaml.safe_load(open(config_file)))
         model = get_model(config_dict.pop('model'))
         processor = get_processor(config_dict.pop('processor'))
-        # device = config_dict['device']
-        # train(config_dict, model, processor, data_dir=dataset_path, device=device)
+        device = config_dict['device']
+        train(config_dict, model, processor, data_dir=dataset_path, device=device)
         
         # Load pretrained weights instead of training
         # model.load_state_dict(torch.load('models/detr_model_1.pth')) # MAKE SURE THE LOADED MODEL WAS TRAINED WITH THE SAME CONFIG
-        model_path = 'models/detr_model_1.pth'
-        model.load_state_dict(torch.load(model_path, map_location='cpu'))
-        model.to('cuda:0')
+        # model_path = 'models/detr_model_1.pth'
+        # model.load_state_dict(torch.load(model_path, map_location='cpu'))
+        # model.to('cuda:0')
         trained_detr_models.append(model)
     return trained_detr_models

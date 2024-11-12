@@ -86,7 +86,7 @@ for model_name, preds in final_preds.items():
         df.to_csv(csv_name, index=False)
         tta_files.append(csv_name)
 # --- POSTPROCESSING ---
-config_file = "parameters/postprocessing_config_files/vocal_sweep_53.yaml"
+config_file = "parameters/postprocessing_config_files/twilight_152.yaml"
 config = load_yaml_config(config_file)
 param_config = create_structured_config(config["parameters"])
 
