@@ -1,15 +1,12 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torchvision.models import resnet18
-from torchvision.datasets import ImageFolder
-from torchvision.transforms import Resize, ToTensor
-from torch.utils.data import DataLoader, Dataset
-from glob import glob
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
+import torch
 from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+from torchvision.transforms import Resize, ToTensor
+from tqdm import tqdm
+
+from training.train_neg_model import train_model
+
 
 class NegativeDataset(Dataset):
     def __init__(self, image_ids, img_dir, labels=None):
@@ -30,6 +27,7 @@ class NegativeDataset(Dataset):
             return image, self.labels[idx]
         else:
             return image, self.image_ids[idx]
+
 
 def inference(model, img_dir, test_csv):
     # Load data
@@ -55,24 +53,3 @@ def inference(model, img_dir, test_csv):
                 test_results[ids[i]] = 'NEG' if pred else 'POS'
 
     return test_results
-
-if __name__ == "__main__":
-    from train_neg_model import train_model
-    model = train_model('data/img', 'data/csv_files/Train.csv', 1)
-    result = inference(model, 'data/img', 'data/csv_files/Test.csv')
-
-    neg_resolutions = {}
-    pos_resolutions = {}
-    for id, pred in result.items():
-        h, w = Image.open(f'data/img/{id}').size
-        if pred == 'NEG':
-            if (h, w) not in neg_resolutions:
-                neg_resolutions[(h, w)] = 0
-            neg_resolutions[(h, w)] += 1
-        else:
-            if (h, w) not in pos_resolutions:
-                pos_resolutions[(h, w)] = 0
-            pos_resolutions[(h, w)] += 1
-
-    print(neg_resolutions)
-    print(pos_resolutions)

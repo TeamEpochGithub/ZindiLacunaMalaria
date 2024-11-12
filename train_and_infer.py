@@ -2,6 +2,7 @@ import glob
 import os
 import pandas as pd
 
+from inference.inference_neg_model import inference
 from inference.yolo.inference_yolo_models import yolo_predict_tta
 from inference.detr.inference_detr_models import detr_predict_tta
 from preprocessing.dataset_yolo_format import save_dataset_in_yolo
@@ -29,7 +30,16 @@ detr_models = get_trained_detr_models(
     glob.glob('config_files/detr_train_config_files/*.yaml'),
     'data/yolo_ds/dataset.yaml'
 )
+neg_model = train_model('data/img', 'data/Train.csv', 2)
+
 # --- INFERENCE ---
+# save our NEG predictions in a csv
+result = inference(neg_model, '../data/img', '../data/csv_files/Test.csv')
+neg_preds = []
+for id, pred in result.items():
+    neg_preds.append([id, pred.replace("POS", "NON_NEG")])
+pd.DataFrame(neg_preds, columns=['Image_ID', 'class']).to_csv('../data/csv_files/NEG_OR_NOT2.csv', index=False)
+
 test_df = pd.read_csv('data/csv_files/Test.csv')
 test_images_paths = glob.glob('data/img/*.jpg')
 test_image_ids = [os.path.basename(img) for img in test_images_paths]
@@ -52,4 +62,4 @@ for model, config_file in zip(detr_models, detr_config_files):
 os.makedirs('data/predictions', exist_ok=True)
 for model_name, preds in final_preds.items():
     for i, df in enumerate(preds):
-        df.to_csv(f'data/predictions/{model_name[:3]}_predictions_{i+1}.csv', index=False)
+        df.to_csv(f'data/predictions/{model_name[:3]}_predictions_{i + 1}.csv', index=False)
