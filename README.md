@@ -24,10 +24,9 @@ Models were trained on machines with the following specifications:
 - RAM: 96GB / 128GB
 - OS: Linux 6.8.0-48-generic
 - Python: 3.10.14
-- Estimated training time: 7 hours for the DETR, 2 hours for YOLO.
+- Estimated training time: 7-8 hours for the DETR, 2-3 hours for YOLO.
 
-For running inference, a machine with at least 32GB of RAM is recommended. We have not tried running the inference on a
-machine with less RAM using all the test data that was provided by DrivenData.
+For running inference, a machine with at least 32GB of RAM is recommended.
 
 ### 1. Clone the repository
 
