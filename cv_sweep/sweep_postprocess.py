@@ -329,6 +329,7 @@ def run_experiment(config_file):
 
         # Collect metrics from results
         for result in results:
+            print(result)
             logging.info(f"metrics: mAP: {result['mAP']}, AP_Troph: {result['AP_troph']}, AP_WBC: {result['AP_WBC']}, LAMR_Troph: {result['lamr_troph']}, LAMR_WBC: {result['lamr_WBC']}")
             
             cv_metrics["mAP"].append(result["mAP"])
@@ -341,7 +342,7 @@ def run_experiment(config_file):
         # Calculate and log mean metrics
         mean_metrics = {k: np.mean(v) for k, v in cv_metrics.items()}
         logging.info(f"Mean metrics: {mean_metrics}")
-        wandb.log(mean_metrics)
+        # wandb.log(mean_metrics)
         
 
         
