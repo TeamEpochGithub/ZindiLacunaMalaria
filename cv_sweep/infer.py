@@ -58,8 +58,8 @@ for i in range(1, 6):
         print(len(preds))
         print(preds)
         for k, df in enumerate(preds):
-            os.makedirs(f'data/predictions/SPLIT{k}/{model_name}', exist_ok=True)
-            df.to_csv(f'data/predictions/SPLIT{k}/{model_name}/predictions_{i}.csv', index=False)
+            os.makedirs(f'data/predictions/SPLIT{i}/{model_name}', exist_ok=True)
+            df.to_csv(f'data/predictions/SPLIT{i}/{model_name}/predictions_{k}.csv', index=False)
 
 
 

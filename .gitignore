@@ -3,6 +3,7 @@ data/predictions/*
 csv_cv/*
 wandb/*
 temp_files/*
+data/predictions/*
 # Submissions 
 submissions/
 
