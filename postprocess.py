@@ -7,6 +7,28 @@ from util.save import add_negs_to_submission
 from util.yaml_structuring import create_structured_config, load_yaml_config
 from postprocessing.postprocess_functions import postprocessing_pipeline, ensemble_class_specific_pipeline
 import logging
+import torch
+from torchvision.ops import nms
+
+def _apply_nms_to_boxes(boxes: torch.Tensor, scores: torch.Tensor, labels: torch.Tensor, 
+                       iou_threshold: float) -> tuple:
+    """Apply NMS to boxes, handling all classes together."""
+    # Apply NMS across all classes at once
+    keep = nms(boxes, scores, iou_threshold)
+
+    return keep
+
+def apply_nms_to_df(df, iou_threshold, score_col="confidence"):
+    df = df.copy()
+    boxes = df[["xmin","ymin","xmax", "ymax"]].values
+    scores = df[score_col].values
+    labels = df["class"].map({"Trophozoite": 0, "WBC": 1}).to_numpy()
+    boxes = torch.tensor(boxes)
+    scores = torch.tensor(scores)
+    labels = torch.tensor(labels)
+    keep = _apply_nms_to_boxes(boxes, scores, labels, iou_threshold)
+    df = df.iloc[keep]
+    return df
 
 def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
     logging.info(f"Running fold {fold_num}")
@@ -81,10 +103,11 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
     detr_pipeline_config = create_pipeline_config(
         config["postprocessing"]["individual_detr"], config["input"]
     )
-    #TODO add detr
-    # if detr_pipeline_config["allclass_use_class_independent_nms"]:
-    #     detr_tta_df = apply_nms_to_df(detr_tta_df, detr_pipeline_config["allclass_nms_iou_threshold"])
+    
+    if detr_pipeline_config["allclass_use_class_independent_nms"]:
+        detr_tta_df = apply_nms_to_df(detr_tta_df, detr_pipeline_config["allclass_nms_iou_threshold"])
 
+    
     detr_df = postprocessing_pipeline(detr_pipeline_config, detr_tta_df)
 
     # Final ensemble
