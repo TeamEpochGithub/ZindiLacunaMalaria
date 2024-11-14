@@ -32,8 +32,7 @@ def apply_nms_to_df(df, iou_threshold, score_col="confidence"):
     df = df.copy()
     boxes = df[["xmin","ymin","xmax", "ymax"]].values
     scores = df[score_col].values
-    labels = df["class"].values
-    labels = labels.map({"Trophozoite": 0, "WBC": 1})
+    labels = df["class"].map({"Trophozoite": 0, "WBC": 1}).to_numpy()
     boxes = torch.tensor(boxes)
     scores = torch.tensor(scores)
     labels = torch.tensor(labels)
@@ -218,11 +217,6 @@ def run_fold(config, fold_num, yolo11_cv_files_split, detr_cv_files):
     print(f"AP: {ap_dict}")
     print(f"LAMR: {lamr_dict}")
 
-    # Early stopping check on fold 1
-    if fold_num == 1 and map_score < 0.86:
-        print(f"Early stopping: Fold 1 mAP ({map_score:.4f}) below threshold")
-        return None  # Exit this trial and move to next wandb suggestion
-
     return {
         "mAP": map_score,
         "AP_troph": ap_dict["Trophozoite"],
@@ -315,8 +309,6 @@ def run_experiment(config_file):
         results = []
         for i in range(1, 6):
             result = run_fold(config, i, yolo11_cv_files[i - 1], detr_cv_files[i - 1])
-            if result is None:
-                break
             results.append(result)
             # Log fold-wise metrics
             wandb.log(
@@ -328,6 +320,10 @@ def run_experiment(config_file):
                     f"fold_{i}_lamr_WBC": result["lamr_WBC"],
                 }
             )
+
+            if result["mAP"] < .86:
+                break
+
 
         # Check if any results were collected
         if results:
