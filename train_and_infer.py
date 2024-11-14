@@ -36,17 +36,21 @@ detr_models = get_trained_detr_models(
     glob.glob('config_files/detr_train_config_files/*.yaml'),
     'data/yolo_ds/dataset.yaml'
 )
-if "neg_model.pth" not in os.listdir("models"):
-    neg_model = train_model('data/img', 'data/csv_files/Train.csv', 2)
+os.makedirs("models", exist_ok=True)
+neg_model = train_model('data/img', 'data/csv_files/Train.csv', 2)
     # Save the model's state_dict
-    torch.save(neg_model.state_dict(), 'models/neg_model.pth')
-else:
-    # Initialize the model architecture
-    neg_model = initialize_model()
-    # Load the saved state_dict
-    neg_model.load_state_dict(torch.load("models/neg_model.pth"))
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    neg_model.to(device)
+torch.save(neg_model.state_dict(), 'models/neg_model.pth')
+# if "neg_model.pth" not in os.listdir("models"):
+#     neg_model = train_model('data/img', 'data/csv_files/Train.csv', 2)
+#     # Save the model's state_dict
+#     torch.save(neg_model.state_dict(), 'models/neg_model.pth')
+# else:
+#     # Initialize the model architecture
+#     neg_model = initialize_model()
+#     # Load the saved state_dict
+#     neg_model.load_state_dict(torch.load("models/neg_model.pth"))
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     neg_model.to(device)
 train_time = time() - train_start
 print(f"Training took {train_time / 3600:.2f} hours")
 
