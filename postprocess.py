@@ -83,8 +83,7 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
         config['postprocessing']['ensemble_all'],
         config['input']
     )
-    final_weights = [[config['troph_weights']['yolo_weight'], config['troph_weights']['detr_weight']],
-                        [config['wbc_weights']['yolo_weight'], config['wbc_weights']['detr_weight']]]
+    final_weights = [[1, 1], [1, 1]]
     all_df = ensemble_class_specific_pipeline(
         CONFIG=final_pipeline_config,
         df_list=[yolo_tta_df, detr_df],
