@@ -204,10 +204,8 @@ def basic_postprocess(df, data_dir, neg_csv, test_csv):
 
 def spatial_density_contour_troph(
     df, df_train, CONFIG, option,
-    base_adjustment, density_multiplier,
-    percentile_low, percentile_high,
-    low_density_adjustment, high_density_adjustment,
-    log_scale_factor, expit_scale,
+    base_adjustment, percentile_low, percentile_high,
+    low_density_adjustment, high_density_adjustment, expit_scale,
     adjustment_range_low, adjustment_range_high
 ):
   
@@ -224,6 +222,7 @@ def spatial_density_contour_troph(
     kde_density_norm = kde_density_troph / kde_density_troph.max()
     
     if option == 0:
+        density_multiplier = 1-base_adjustment
         adjustment = base_adjustment + (density_multiplier * kde_density_norm)
     elif option == 1:
         density_percentile = np.percentile(kde_density_norm, [percentile_low, percentile_high])
@@ -232,6 +231,8 @@ def spatial_density_contour_troph(
         adjustment[kde_density_norm > density_percentile[1]] = high_density_adjustment
     elif option == 2:
         log_scale = np.log1p(kde_density_norm)
+        log_scale /= log_scale.max()
+        log_scale_factor = 1 - adjustment_range_low
         adjustment = adjustment_range_low + (log_scale_factor * log_scale)
     elif option == 3:
         high_density_threshold = np.percentile(kde_density_norm, percentile_high)
@@ -241,11 +242,12 @@ def spatial_density_contour_troph(
         adjustment = np.ones_like(kde_density_norm)
         adjustment[high_density_mask] = high_density_adjustment
         adjustment[low_density_mask] = low_density_adjustment
+        adjustment[np.logical_and(~high_density_mask, ~low_density_mask)] = 0.9
     elif option == 4:
         from scipy.special import expit
         centered_density = kde_density_norm - kde_density_norm.mean()
         smooth_step = expit(centered_density * expit_scale)
-        adjustment = adjustment_range_low + ((adjustment_range_high - adjustment_range_low) * smooth_step)
+        adjustment = adjustment_range_low + ((1 - adjustment_range_low) * smooth_step)
     
     # Apply adjustment and clip
     df_troph['confidence'] = np.clip(df_troph['confidence'] * adjustment, 0, 1)
@@ -318,11 +320,11 @@ def spatial_density_contour_wbc(
 
 
 def postprocessing_pipeline(CONFIG, df):
-    """Run postprocessing pipeline with the given configuration. If a dataframe is provided, it will be used as input. Otherwise, the input CSV file will be read."""
+    """Run postprocessing pipeline with the given configuration. """
     # Unpack flags and parameters from CONFIG
     flags = ['use_size_adjustment', 'use_remove_edges', 'use_spatial_density_troph', 'use_spatial_density_wbc']
     params = {key: CONFIG.get(key) for key in CONFIG.keys() if key not in flags}
-    
+    print(params)
     # Read initial data
     train_df = pd.read_csv(CONFIG['TRAIN_CSV'])
     # Process bounding boxes
@@ -382,7 +384,8 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
     """Run ensemble pipeline with class-specific parameters."""
     # Initialize empty result DataFrame
     final_df = pd.DataFrame()
-    
+    # TODO: remove above line
+
     # Process each class separately
     for j, class_name in enumerate(classes):
         class_key = class_name  # Convert to lowercase for config keys
@@ -392,6 +395,8 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
         class_config = {
             'form': CONFIG.get(f'{class_key}_form', 'wbf'),
             'nms_iou_threshold': CONFIG.get(f'{class_key}_nms_iou_threshold'),
+            'voting_iou_threshold': CONFIG.get(f'{class_key}_voting_iou_threshold'),
+            'soft_nms_iou_threshold': CONFIG.get(f'{class_key}_soft_nms_iou_threshold'),
             'wbf_iou_threshold': CONFIG.get(f'{class_key}_wbf_iou_threshold'),
             'wbf_conf_threshold': CONFIG.get(f'{class_key}_wbf_conf_threshold'),
             'wbf_reduction': CONFIG.get(f'{class_key}_wbf_reduction')
@@ -399,6 +404,7 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
         # print(df_list[0].head())
         # Filter DataFrames for current class
         class_dfs = [df[df['class'] == class_name].copy() for df in df_list]
+        class_dfs = [df[df['confidence'] > 1e-3] for df in class_dfs]
         # print(class_config)
         # Create class-specific ensemble
         if class_config['form'] == 'wbf':
@@ -417,10 +423,17 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
                 classes=[class_name],
                 conf_threshold=0.001 #TODO
             )
+        elif class_config['form'] == 'voting':
+            ensemble = DualEnsemble(
+                form='voting',
+                iou_threshold=class_config['voting_iou_threshold'],
+                classes=[class_name],
+                conf_threshold=0.1 #TODO
+            )
         elif class_config['form'] == 'soft_nms':
             ensemble = DualEnsemble(
                 form='soft_nms',
-                iou_threshold=class_config['nms_iou_threshold'],
+                iou_threshold=class_config['soft_nms_iou_threshold'],
                 classes=[class_name],
                 conf_threshold=0.001 #TODO
             )
@@ -433,25 +446,24 @@ def ensemble_class_specific_pipeline(CONFIG, df_list, weight_list, classes=["Tro
     
     return final_df
 
+# if __name__ == "__main__":
 
-if __name__ == "__main__":
 
+#     # Base config for file paths
+#     yolo_config_file = "parameters/postprocessing_config_files/yolo_postprocessing/yolo_pp2.yaml"
+#     base_config_file = "parameters/postprocessing_config_files/base_pp.yaml"
 
-    # Base config for file paths
-    yolo_config_file = "parameters/postprocessing_config_files/yolo_postprocessing/yolo_pp2.yaml"
-    base_config_file = "parameters/postprocessing_config_files/base_pp.yaml"
+#     base_config = dict(yaml.safe_load(open(base_config_file, 'r')))
+#     pp_yolo_config = dict(yaml.safe_load(open(yolo_config_file, 'r')))
 
-    base_config = dict(yaml.safe_load(open(base_config_file, 'r')))
-    pp_yolo_config = dict(yaml.safe_load(open(yolo_config_file, 'r')))
+#     CONFIG = base_config
+#     # Load parameters for the selected trial
+#     CONFIG.update(pp_yolo_config)
 
-    CONFIG = base_config
-    # Load parameters for the selected trial
-    CONFIG.update(pp_yolo_config)
+#     #create a dictionary for the output csv
+#     os.makedirs(os.path.dirname(base_config['OUTPUT_CSV']), exist_ok=True)
+#     # Run postprocessing pipeline with selected trial parameters
+#     df_processed = postprocessing_pipeline(CONFIG)
 
-    #create a dictionary for the output csv
-    os.makedirs(os.path.dirname(base_config['OUTPUT_CSV']), exist_ok=True)
-    # Run postprocessing pipeline with selected trial parameters
-    df_processed = postprocessing_pipeline(CONFIG)
-
-    df_processed.to_csv(CONFIG['OUTPUT_CSV'], index=False)
+#     df_processed.to_csv(CONFIG['OUTPUT_CSV'], index=False)
 

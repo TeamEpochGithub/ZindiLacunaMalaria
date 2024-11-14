@@ -100,13 +100,47 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
 
 # def run_minimal_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
 
+# if __name__ == '__main__':
+#     config_file = "parameters/postprocessing_config_files/vocal_sweep_53.yaml"
+#     config = load_yaml_config(config_file)
+#     print(config)
+#     param_config = create_structured_config(config["parameters"])
+#     print("\n",param_config)
+#     # Cross-validation files
+#     detr_cv_files =     ["data/predictions/test_marcin_pp/tta_pred_1_pp.csv",
+#                         "data/predictions/test_marcin_pp/tta_pred_2_pp.csv",
+#                         "data/predictions/test_marcin_pp/tta_pred_3_pp.csv",
+#                         "data/predictions/test_marcin_pp/tta_pred_4_pp.csv"
+#                         ]   #TODO
+
+
+# # ["data/predictions/test_1112/tta_pred_1.csv",
+# #                         "data/predictions/test_1112/tta_pred_2.csv",
+# #                         "data/predictions/test_1112/tta_pred_3.csv",
+# #                         "data/predictions/test_1112/tta_pred_4.csv"
+# #                         ]   #TODO
+    
+
+#     yolo11_cv_files = [
+#         "data/predictions/yolo_test/yol/predictions_1.csv",
+#         "data/predictions/yolo_test/yol/predictions_2.csv",
+#         "data/predictions/yolo_test/yol/predictions_3.csv",
+#         "data/predictions/yolo_test/yol/predictions_4.csv"
+    
+        
+#     ]
+
+#     all_df = run_postprocessing(param_config, 1, yolo11_cv_files, detr_cv_files)
+#     neg_all_df = add_negs_to_submission(df=all_df, neg_csv="data/csv_files/NEG_OR_NOT.csv",test_csv="data/csv_files/Test.csv")
+#     neg_all_df.to_csv("submissions/vocal_sweep_53_marcin.csv", index=False)
+ 
 if __name__ == '__main__':
+    import cProfile
+    import pstats
     config_file = "parameters/postprocessing_config_files/vocal_sweep_53.yaml"
     config = load_yaml_config(config_file)
-    print(config)
     param_config = create_structured_config(config["parameters"])
-    print("\n",param_config)
-    # Cross-validation files
+
     detr_cv_files =     ["data/predictions/test_marcin_pp/tta_pred_1_pp.csv",
                         "data/predictions/test_marcin_pp/tta_pred_2_pp.csv",
                         "data/predictions/test_marcin_pp/tta_pred_3_pp.csv",
@@ -114,24 +148,19 @@ if __name__ == '__main__':
                         ]   #TODO
 
 
-# ["data/predictions/test_1112/tta_pred_1.csv",
-#                         "data/predictions/test_1112/tta_pred_2.csv",
-#                         "data/predictions/test_1112/tta_pred_3.csv",
-#                         "data/predictions/test_1112/tta_pred_4.csv"
-#                         ]   #TODO
-    
 
     yolo11_cv_files = [
         "data/predictions/yolo_test/yol/predictions_1.csv",
         "data/predictions/yolo_test/yol/predictions_2.csv",
         "data/predictions/yolo_test/yol/predictions_3.csv",
-        "data/predictions/yolo_test/yol/predictions_4.csv"
-    
-        
+        "data/predictions/yolo_test/yol/predictions_4.csv"   
     ]
-
+    profiler = cProfile.Profile()
+    profiler.enable()
     all_df = run_postprocessing(param_config, 1, yolo11_cv_files, detr_cv_files)
-    neg_all_df = add_negs_to_submission(df=all_df, neg_csv="data/csv_files/NEG_OR_NOT.csv",test_csv="data/csv_files/Test.csv")
-    neg_all_df.to_csv("submissions/vocal_sweep_53_marcin.csv", index=False)
- 
-    
+    profiler.disable()
+
+    # Save the profiling results
+    stats = pstats.Stats(profiler).sort_stats('cumulative')
+    stats.print_stats()
+    stats.dump_stats('run_postprocessing_profile.prof')
