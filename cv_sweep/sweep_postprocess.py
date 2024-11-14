@@ -33,10 +33,11 @@ def apply_nms_to_df(df, iou_threshold, score_col="confidence"):
     boxes = df[["xmin","ymin","xmax", "ymax"]].values
     scores = df[score_col].values
     labels = df["class"].values
+    labels = labels.map({"Trophozoite": 0, "WBC": 1})
     boxes = torch.tensor(boxes)
     scores = torch.tensor(scores)
     labels = torch.tensor(labels)
-    keep, = _apply_nms_to_boxes(boxes, scores, labels, iou_threshold)
+    keep = _apply_nms_to_boxes(boxes, scores, labels, iou_threshold)
     df = df.iloc[keep]
     return df
 
