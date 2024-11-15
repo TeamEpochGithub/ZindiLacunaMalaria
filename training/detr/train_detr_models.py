@@ -3,8 +3,23 @@ from .core.model import get_model, get_processor
 from .core.train import train
 from pprint import pprint
 import torch
+import random
+import numpy as np
+
+def make_deterministic(seed: int = 42) -> None:
+    """Set random seeds for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
 def get_trained_detr_models(config_files, dataset_path) -> list:
+    make_deterministic()
     trained_detr_models = []
     for config_file in config_files:
         config_dict = dict(yaml.safe_load(open(config_file)))
