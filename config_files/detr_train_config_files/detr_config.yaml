@@ -104,8 +104,8 @@ training:
   train_batch_size: 4
   n_accum: 1
   num_epochs: 60 #TODO change
-  learning_rate: 0.0004630770829815448
-  warmup_steps: 1200
+  learning_rate: 0.00046921239480795255
+  warmup_steps: 400
 
 ema:
   enabled: true
