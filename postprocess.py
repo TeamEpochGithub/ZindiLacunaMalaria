@@ -88,7 +88,8 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
     detr_dfs = []
     for tta_flip in range(len(detr_cv_files)):
         detr_df = pd.read_csv(detr_cv_files[tta_flip])
-        detr_dfs.append(detr_df)
+        detr_df_nms = apply_nms_to_df(detr_tta_df, 0.6)
+        detr_dfs.append(detr_df_nms)
 
     detr_tta_config = create_pipeline_config(
         config["postprocessing"]["ensemble_ttadetr"], config["input"]
@@ -104,8 +105,7 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
         config["postprocessing"]["individual_detr"], config["input"]
     )
     
-    if detr_pipeline_config["allclass_use_class_independent_nms"]:
-        detr_tta_df = apply_nms_to_df(detr_tta_df, detr_pipeline_config["allclass_nms_iou_threshold"])
+        
 
     
     detr_df = postprocessing_pipeline(detr_pipeline_config, detr_tta_df)
