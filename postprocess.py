@@ -88,7 +88,7 @@ def run_postprocessing(config, fold_num, yolo11_cv_files_split, detr_cv_files):
     detr_dfs = []
     for tta_flip in range(len(detr_cv_files)):
         detr_df = pd.read_csv(detr_cv_files[tta_flip])
-        detr_df_nms = apply_nms_to_df(detr_tta_df, 0.6)
+        detr_df_nms = apply_nms_to_df(detr_df, 0.6)
         detr_dfs.append(detr_df_nms)
 
     detr_tta_config = create_pipeline_config(
