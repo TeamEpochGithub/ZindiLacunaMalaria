@@ -30,7 +30,7 @@ def get_trained_detr_models(config_files, dataset_path) -> list:
         train(config_dict, model, processor, data_dir=dataset_path, device=device)
         os.makedirs("models", exist_ok=True)
 
-        torch.save(model.state_dict(), f"models/detr_model_{i}.pth")
+        torch.save(model.state_dict(), f"models/detr_model.pth")
         
         # Load pretrained weights instead of training
         # model.load_state_dict(torch.load('models/detr_model_1.pth')) # MAKE SURE THE LOADED MODEL WAS TRAINED WITH THE SAME CONFIG
