@@ -87,7 +87,9 @@ The final predictions are exported to `submission.csv`, ready for submission.
 
 ### Notes
 - For detailed parameter settings and methods, refer to the `postprocessing.py` script.
+- For hyperparemeters refer to the config files located in : `config_files/detr_train_config_files` and `config_files/yolo_train_config_files`.
 - The pipeline ensures an organized flow from raw data to final predictions.
+- Models were validated using our own map calculation located in : `util/mAP_zindi.py`
 
 ## Getting started
 
