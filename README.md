@@ -98,7 +98,7 @@ The final predictions are exported to `submission.csv`, ready for submission.
 This section contains the steps that need to be taken to get started with our project and fully reproduce our best
 submission on the public and private leaderboard. The project was developed on Ubuntu 22.04, and on Python 3.10.
 
-### 0. Prerequisites
+### Prerequisites
 Models were trained on machine with the following specifications:
 - CPU: AMD Ryzen 9 7950X 16-Core Processor
 - GPU: NVIDIA RTX Quadro 6000
@@ -116,11 +116,11 @@ Make sure to clone the repository with your favourite git client or using the fo
 https://github.com/TeamEpochGithub/ZindiLacunaMalaria.git
 ```
 
-### 2. Install Python 3.10
+### Install Python 3.10
 
 You can install the required python version here: [Python 3.10](https://www.python.org/downloads/release/python-31015/)
 
-### 3. Install the required packages
+### Install the required packages
 
 Install the required packages (on a virtual environment is recommended) using the following command:
 
@@ -130,7 +130,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Setup the competition data
+### Setup the competition data
 
 The data of the competition can be downloaded here: [Lacuna Malaria Detection Challenge](https://zindi.africa/competitions/lacuna-malaria-detection-challenge/data)
 
@@ -149,9 +149,19 @@ data/
     
 ```
 
-### 5. Main file explanation
+### Main file explanation
 
-- `main.py`: This runs the entire end-to-end solution elaborated earlier. 
+- `main.py`: This runs the entire end-to-end solution elaborated earlier.
+
+## Inference and Deployment
+
+The script `inference.py` enables quick deployment and prediction.
+
+## Maintenance and monitoring:
+
+Regularly audit ETL pipelines for data integrity and scalability, and monitor model metrics (e.g., precision, recall, mAP) to detect performance drift. Automate retraining triggers and validate postprocessing logic, such as NEG model adjustments, to ensure consistent outputs.
+
+Leverage cloud platforms for scalability, and use CI/CD pipelines for efficient model updates. Integrate new data into workflows and retrain models as needed. Implement drift detection and maintain documentation to support long-term usability and accessibility for healthcare practitioners. Note: use only the yolo models if implementing for a phone app.
 
 ## Contributors
 
