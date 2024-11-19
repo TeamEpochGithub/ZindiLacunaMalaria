@@ -10,6 +10,8 @@
 
 This is Team Epoch's solution to the [Lacuna Malaria Detection Challenge](https://zindi.africa/competitions/lacuna-malaria-detection-challenge), hosted by Zindi. 
 
+The Public score achieved was : 0.928012335, and Private score: 0.924725824.
+
 A technical report will be written and uploaded after the competition finale.
 
 ## Overview and objectives
@@ -147,9 +149,9 @@ data/
     
 ```
 
-## Main file explanation
+### 5. Main file explanation
 
-- `main.py`: This code preprocesses the training dataset by filtering redundant bounding boxes, trains YOLO and DETR models using configuration files, and trains a separate NEG model. It performs inference on test images using these models and Test Time Augmentation (TTA). The NEG predictions are saved in a CSV file and YOLO/DETR predictions in separate CSV files for each model. The results are stored in the data/predictions folder, with filenames indicating the model and split. The csv files are post processed, and saved in submissions/final_submission.csv.
+- `main.py`: This runs the entire end-to-end solution elaborated earlier. 
 
 ## Contributors
 
