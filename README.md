@@ -92,15 +92,15 @@ The final predictions are exported to `submission.csv`, ready for submission.
 ## Getting started
 
 This section contains the steps that need to be taken to get started with our project and fully reproduce our best
-submission on the public and private leaderboard. The project was developed on Linux 6.8.0-48-generic, and on Python 3.10.14 on Pip version 22.0.2.
+submission on the public and private leaderboard. The project was developed on Ubuntu 22.04, and on Python 3.10.
 
 ### 0. Prerequisites
-Models were trained on machines with the following specifications:
-- CPU: AMD Ryzen Threadripper Pro 3945WX 12-Core Processor / AMD Ryzen 9 7950X 16-Core Processor
-- GPU: NVIDIA RTX A5000 / NVIDIA RTX Quadro 6000 / NVIDIA RTX A6000
-- RAM: 96GB / 128GB
-- OS: Linux 6.8.0-48-generic
-- Python: 3.10.14
+Models were trained on machine with the following specifications:
+- CPU: AMD Ryzen 9 7950X 16-Core Processor
+- GPU: NVIDIA RTX Quadro 6000
+- RAM: 96GB
+- OS: Ubuntu 22.04
+- Python: 3.10.12
 - Estimated training time: 7-8 hours for the DETR, 2-3 hours for YOLO.
 
 
@@ -112,15 +112,17 @@ Make sure to clone the repository with your favourite git client or using the fo
 https://github.com/TeamEpochGithub/ZindiLacunaMalaria.git
 ```
 
-### 2. Install Python 3.10.13
+### 2. Install Python 3.10
 
-You can install the required python version here: [Python 3.10.13](https://github.com/adang1345/PythonWindows/tree/master/3.10.14)
+You can install the required python version here: [Python 3.10](https://www.python.org/downloads/release/python-31015/)
 
 ### 3. Install the required packages
 
 Install the required packages (on a virtual environment is recommended) using the following command:
 
 ```
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
