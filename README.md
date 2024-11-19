@@ -12,6 +12,11 @@ This is Team Epoch's solution to the [Lacuna Malaria Detection Challenge](https:
 
 A technical report will be written and uploaded after the competition finale.
 
+## Overview and objectives
+
+The solution is intended to address malaria problems in Africa, to help doctors speed up infection diganoses, with minimal equipment, without having to independently look through a large amount of blood cell images themselves.
+The dataset provided by Zindi and the Lacuna Fund consist of roughly 3000 images of blood cells under a microscope. The objective of the competition is to draw bounding boxes around different objects, or classes in the image. These classes are: White Blood Cells (WBCs), Trophozoites, and Negative (NEG).
+
 ## Getting started
 
 This section contains the steps that need to be taken to get started with our project and fully reproduce our best
@@ -26,7 +31,6 @@ Models were trained on machines with the following specifications:
 - Python: 3.10.14
 - Estimated training time: 7-8 hours for the DETR, 2-3 hours for YOLO.
 
-For running inference, a machine with at least 32GB of RAM is recommended.
 
 ### 1. Clone the repository
 
@@ -67,7 +71,7 @@ data/
     
 ```
 
-### 5. Main file explanation
+## Main file explanation
 
 - `main.py`: This code preprocesses the training dataset by filtering redundant bounding boxes, trains YOLO and DETR models using configuration files, and trains a separate NEG model. It performs inference on test images using these models and Test Time Augmentation (TTA). The NEG predictions are saved in a CSV file and YOLO/DETR predictions in separate CSV files for each model. The results are stored in the data/predictions folder, with filenames indicating the model and split. The csv files are post processed, and saved in submissions/final_submission.csv.
 
