@@ -14,8 +14,80 @@ A technical report will be written and uploaded after the competition finale.
 
 ## Overview and objectives
 
-The solution is intended to address malaria problems in Africa, to help doctors speed up infection diganoses, with minimal equipment, without having to independently look through a large amount of blood cell images themselves.
-The dataset provided by Zindi and the Lacuna Fund consist of roughly 3000 images of blood cells under a microscope. The objective of the competition is to draw bounding boxes around different objects, or classes in the image. These classes are: White Blood Cells (WBCs), Trophozoites, and Negative (NEG).
+This solution aims to tackle malaria challenges in Africa by assisting doctors in rapidly diagnosing infections with minimal equipment. By automating the analysis of blood cell images, it reduces the need for manual examination of large datasets, allowing healthcare professionals to focus on treatment and care.
+
+The dataset, provided by Zindi and the Lacuna Fund, includes approximately 3,000 microscope images of blood cells. The competition's goal is to identify and localize key objects within these images by drawing bounding boxes around three classes:
+
+- White Blood Cells (WBCs)
+- Trophozoites
+- Negative (NEG)
+
+This project strives to make a meaningful impact on malaria diagnostics, particularly in resource-limited settings.
+
+## End-to-End Machine Learning Workflow
+
+![Workflow Diagram](./assets/mermaid-diagram-2024-11-19-120022.png)
+
+This section outlines the process of extracting, transforming, modeling, and preparing predictions for submission in a machine learning workflow.
+
+---
+
+### Preprocessing
+
+1. **Dataset Preparation**:
+   - Convert the dataset into YOLO format.
+   - Filter bounding boxes using an IoU threshold to remove duplicate boxes.
+
+2. **Data Extraction**:
+   - Source data is extracted from the provided CSV files.
+
+---
+
+### Modeling
+
+Three models are trained to perform specific tasks:
+- **YOLO (11m)**: For general object detection.
+- **DETR**: Another object detection model to complement YOLO.
+- **NEG Model**: Specialized in identifying "NEG" images in predictions.
+
+---
+
+### Test-Time Augmentation (TTA)
+
+After training, each model undergoes test-time augmentation using the following techniques:
+- Horizontal Flip
+- Vertical Flip
+- Horizontal and Vertical Flip
+- No Flip
+
+The predictions for each augmentation are ensembled for every model.
+
+---
+
+### Ensembling
+
+1. Ensemble the TTA predictions for each individual model.
+2. Combine the ensembled predictions of all models into a unified set.
+
+---
+
+### Postprocessing
+
+1. Apply techniques defined in `postprocessing.py`:
+   - Use the **NEG Model** to adjust predictions by converting "NEG" predictions as needed.
+   - Refine bounding boxes, labels, and confidence scores.
+
+---
+
+### Submission
+
+The final predictions are exported to `submission.csv`, ready for submission.
+
+---
+
+### Notes
+- For detailed parameter settings and methods, refer to the `postprocessing.py` script.
+- The pipeline ensures an organized flow from raw data to final predictions.
 
 ## Getting started
 
